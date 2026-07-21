@@ -92,10 +92,21 @@ export default function Cart() {
     return (
       <SafeAreaView style={st.safe} edges={['top']}>
         <View style={st.headerRow}>
-          <Pressable onPress={() => router.push('/')} style={st.homeBtn}>
-            <Text style={st.homeText}>⌂ בית</Text>
+          <Pressable
+            onPress={() => (router.canGoBack() ? router.back() : router.push('/shop'))}
+            style={st.backBtn}
+          >
+            <Text style={st.backText}>→ המשך קניות</Text>
           </Pressable>
-          <Text style={st.title}>העגלה שלי</Text>
+          <View style={st.headerRow}>
+        <Pressable
+          onPress={() => (router.canGoBack() ? router.back() : router.push('/shop'))}
+          style={st.backBtn}
+        >
+          <Text style={st.backText}>→ המשך קניות</Text>
+        </Pressable>
+        <Text style={st.title}>העגלה שלי</Text>
+      </View>
         </View>
         <View style={st.center}>
           <Text style={st.empty}>העגלה ריקה</Text>
@@ -107,12 +118,7 @@ export default function Cart() {
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <View style={st.headerRow}>
-        <Pressable onPress={() => router.push('/')} style={st.homeBtn}>
-          <Text style={st.homeText}>⌂ בית</Text>
-        </Pressable>
-        <Text style={st.title}>העגלה שלי</Text>
-      </View>
+      <Text style={st.title}>העגלה שלי</Text>
       <ScrollView contentContainerStyle={st.scroll}>
         {cart.items.map((item) => (
           <View key={item.key} style={st.card}>
@@ -175,6 +181,14 @@ export default function Cart() {
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   title: { color: C.text, fontSize: 24, fontWeight: '800', textAlign: 'right' },
+  backBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: R.full,
+    borderWidth: 1.5,
+    borderColor: C.accent,
+  },
+  backText: { color: C.accent, fontSize: 14, fontWeight: '800' },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

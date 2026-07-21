@@ -9,12 +9,7 @@ const SITE = 'https://elronprint.co.il';
 export default function Account() {
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <View style={st.headerRow}>
-        <Pressable onPress={() => router.push('/')} style={st.homeBtn}>
-          <Text style={st.homeText}>⌂ בית</Text>
-        </Pressable>
-        <Text style={st.title}>החשבון שלי</Text>
-      </View>
+      <Text style={st.title}>החשבון שלי</Text>
       <View style={st.center}>
         <Text style={st.hint}>התחברות, הזמנות וטיוטות — יחוברו בשלב הבא</Text>
 
@@ -32,7 +27,7 @@ export default function Account() {
 
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
-  title: { color: C.text, fontSize: 24, fontWeight: '800', textAlign: 'right' },
+  title: { color: C.text, fontSize: 24, fontWeight: '800', textAlign: 'right', padding: S.md },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

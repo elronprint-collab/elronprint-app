@@ -157,6 +157,7 @@ function DraggableText({
         const ny = Math.min(AREA_H - 8, Math.max(8, start.current.y + g.dy));
         onMove(nx, ny);
       },
+      onPanResponderTerminationRequest: () => false,
       onPanResponderRelease: onDragEnd,
       onPanResponderTerminate: onDragEnd,
     }),
@@ -165,13 +166,18 @@ function DraggableText({
   const resizePan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
       onPanResponderGrant: () => {
         startSize.current = layerRef.current.size;
         onDragStart();
       },
       onPanResponderMove: (_e, g) => {
-        const next = Math.min(90, Math.max(12, Math.round(startSize.current + g.dy * 0.6)));
+        const delta = (g.dy + -g.dx) / 2; // אלכסונית: למטה-שמאלה מגדיל
+        const next = Math.min(96, Math.max(12, Math.round(startSize.current + delta * 0.7)));
         onResize(next);
       },
       onPanResponderRelease: onDragEnd,
@@ -494,22 +500,19 @@ export default function Studio() {
       >
         <View style={st.headerRow}>
           <View style={st.historyRow}>
-            <Pressable onPress={() => router.push('/')} style={st.histBtn}>
-              <Text style={st.histText}>⌂ בית</Text>
-            </Pressable>
             <Pressable
               onPress={undo}
               disabled={past.current.length === 0}
-              style={[st.histBtn, past.current.length === 0 && st.histBtnOff]}
+              style={[st.arrowBtn, past.current.length === 0 && st.histBtnOff]}
             >
-              <Text style={st.histText}>↩ ביטול</Text>
+              <Text style={st.arrowText}>↶</Text>
             </Pressable>
             <Pressable
               onPress={redo}
               disabled={future.current.length === 0}
-              style={[st.histBtn, future.current.length === 0 && st.histBtnOff]}
+              style={[st.arrowBtn, future.current.length === 0 && st.histBtnOff]}
             >
-              <Text style={st.histText}>חזרה ↪</Text>
+              <Text style={st.arrowText}>↷</Text>
             </Pressable>
           </View>
           <Text style={st.title}>סטודיו עיצוב</Text>
@@ -951,6 +954,17 @@ const st = StyleSheet.create({
     borderColor: C.border,
   },
   histBtnOff: { opacity: 0.35 },
+  arrowBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: R.full,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowText: { color: C.text, fontSize: 22, fontWeight: '800' },
   histText: { color: C.text, fontSize: 13, fontWeight: '700' },
   shirtPreview: {
     marginTop: S.md,
@@ -1005,10 +1019,10 @@ const st = StyleSheet.create({
   removeImgText: { color: C.danger, fontSize: 18, fontWeight: '800' },
   resizeHandle: {
     position: 'absolute',
-    bottom: -14,
-    left: -14,
-    width: 30,
-    height: 30,
+    bottom: -18,
+    left: -18,
+    width: 38,
+    height: 38,
     borderRadius: R.full,
     backgroundColor: C.accent,
     alignItems: 'center',

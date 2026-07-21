@@ -46,12 +46,7 @@ export default function Shop() {
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <View style={st.headerRow}>
-        <Pressable onPress={() => router.push('/')} style={st.homeBtn}>
-          <Text style={st.homeText}>⌂ בית</Text>
-        </Pressable>
-        <Text style={st.title}>החנות</Text>
-      </View>
+      <Text style={st.title}>החנות</Text>
       {products === null ? (
         <View style={st.center}>
           <ActivityIndicator color={C.accent} size="large" />
@@ -94,7 +89,7 @@ export default function Shop() {
 
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
-  title: { color: C.text, fontSize: 24, fontWeight: '800', textAlign: 'right' },
+  title: { color: C.text, fontSize: 24, fontWeight: '800', textAlign: 'right', padding: S.md },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
