@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "ElronPrint",
+    "slug": "elronprint-app",
+    "version": "1.0.0",
+    "scheme": "elronprint",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#141414",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "co.il.elronprint.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "האפליקציה צריכה גישה לגלריה כדי להעלות עיצוב לחולצה",
+        "NSCameraUsageDescription": "האפליקציה צריכה גישה למצלמה כדי לצלם עיצוב לחולצה"
+      }
+    },
+    "android": {
+      "package": "co.il.elronprint.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#141414",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": ["expo-router", "expo-image-picker"],
+    "extra": {
+      "SHOPIFY_DOMAIN": "elronprint.co.il",
+      "SHOPIFY_STOREFRONT_TOKEN": "",
+      "CLOUDINARY_CLOUD": "dztd5g0p8",
+      "CLOUDINARY_PRESET": "elronprint",
+      "VERCEL_API_BASE": "https://elronprint-studio-api.vercel.app/api"
+    }
+  }
+}
