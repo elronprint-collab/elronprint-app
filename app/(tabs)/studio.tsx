@@ -6,7 +6,9 @@ import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  I18nManager,
   PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -47,7 +49,17 @@ const TEXT_COLORS = [
   '#37a7ff', '#ff7a00', '#a259ff', '#00d1c1', '#c0c0c0',
 ];
 
-// אזור ההדפסה בתצוגה
+const HIGHLIGHTS: (string | null)[] = [null, '#000000', '#ffffff', '#00fc25', '#ffd400', '#ff3b6b'];
+
+const ALIGNS = [
+  { key: 'right', label: 'ימין' },
+  { key: 'center', label: 'מרכז' },
+  { key: 'left', label: 'שמאל' },
+] as const;
+
+// תיקון RTL: הסליידר מתהפך בממשק עברי, אז הופכים אותו חזרה
+const SLIDER_INVERTED = Platform.OS === 'web' ? true : I18nManager.isRTL;
+
 const AREA_W = 230;
 const AREA_H = 280;
 
@@ -56,11 +68,15 @@ type Layer = {
   text: string;
   font: (typeof FONTS)[number];
   color: string;
-  size: number; // px
-  x: number; // מרכז, יחסי לאזור
+  size: number;
+  x: number;
   y: number;
-  rotation: number; // מעלות
+  rotation: number;
   outline: boolean;
+  bold: boolean;
+  align: 'right' | 'center' | 'left';
+  highlight: string | null;
+  spacing: number;
 };
 
 let nextId = 1;
@@ -76,6 +92,10 @@ function newLayer(): Layer {
     y: AREA_H / 2,
     rotation: 0,
     outline: false,
+    bold: false,
+    align: 'center',
+    highlight: null,
+    spacing: 0,
   };
 }
 
@@ -84,11 +104,13 @@ function DraggableText({
   selected,
   onSelect,
   onMove,
+  onDragStart,
 }: {
   layer: Layer;
   selected: boolean;
   onSelect: () => void;
   onMove: (x: number, y: number) => void;
+  onDragStart: () => void;
 }) {
   const start = useRef({ x: layer.x, y: layer.y });
   const pan = useRef(
@@ -97,6 +119,7 @@ function DraggableText({
       onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) + Math.abs(g.dy) > 2,
       onPanResponderGrant: () => {
         start.current = { x: layer.x, y: layer.y };
+        onDragStart();
         onSelect();
       },
       onPanResponderMove: (_e, g) => {
@@ -107,8 +130,17 @@ function DraggableText({
     }),
   ).current;
 
-  // עדכון נקודת ההתחלה כשהשכבה זזה מבחוץ
   start.current = selected ? start.current : { x: layer.x, y: layer.y };
+
+  const shadow = layer.outline
+    ? {
+        textShadowColor: layer.color === '#000000' ? '#ffffff' : '#000000',
+        textShadowRadius: 3,
+        textShadowOffset: { width: 0, height: 0 },
+      }
+    : layer.bold
+      ? { textShadowColor: layer.color, textShadowRadius: 0.8, textShadowOffset: { width: 0, height: 0 } }
+      : null;
 
   return (
     <View
@@ -118,7 +150,11 @@ function DraggableText({
         {
           left: layer.x,
           top: layer.y,
-          transform: [{ translateX: '-50%' as never }, { translateY: '-50%' as never }, { rotate: `${layer.rotation}deg` }],
+          transform: [
+            { translateX: '-50%' as never },
+            { translateY: '-50%' as never },
+            { rotate: `${layer.rotation}deg` },
+          ],
         },
         selected && st.layerSelected,
       ]}
@@ -129,13 +165,17 @@ function DraggableText({
             fontFamily: layer.font.family,
             color: layer.color,
             fontSize: layer.size,
-            textAlign: 'center',
+            textAlign: layer.align,
+            letterSpacing: layer.spacing,
+            fontWeight: layer.bold ? '700' : 'normal',
           },
-          layer.outline && {
-            textShadowColor: layer.color === '#000000' ? '#ffffff' : '#000000',
-            textShadowRadius: 3,
-            textShadowOffset: { width: 0, height: 0 },
+          layer.highlight != null && {
+            backgroundColor: layer.highlight,
+            paddingHorizontal: 6,
+            paddingVertical: 2,
+            borderRadius: 3,
           },
+          shadow,
         ]}
         numberOfLines={3}
       >
@@ -158,15 +198,43 @@ export default function Studio() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const selected = layers.find((l) => l.id === selectedId) ?? null;
 
-  const cart = useCart();
-  const hasDesign = !!cloudUrl || layers.some((l) => l.text.trim());
+  // ביטול / חזרה
+  const past = useRef<Layer[][]>([]);
+  const future = useRef<Layer[][]>([]);
+  const [, forceHistory] = useState(0);
 
-  function updateSelected(patch: Partial<Layer>) {
+  function snapshot() {
+    past.current.push(layers.map((l) => ({ ...l })));
+    if (past.current.length > 40) past.current.shift();
+    future.current = [];
+    forceHistory((n) => n + 1);
+  }
+
+  function undo() {
+    const prev = past.current.pop();
+    if (!prev) return;
+    future.current.push(layers.map((l) => ({ ...l })));
+    setLayers(prev);
+    if (selectedId != null && !prev.some((l) => l.id === selectedId)) setSelectedId(null);
+    forceHistory((n) => n + 1);
+  }
+
+  function redo() {
+    const next = future.current.pop();
+    if (!next) return;
+    past.current.push(layers.map((l) => ({ ...l })));
+    setLayers(next);
+    forceHistory((n) => n + 1);
+  }
+
+  function updateSelected(patch: Partial<Layer>, withSnapshot = true) {
     if (selectedId == null) return;
+    if (withSnapshot) snapshot();
     setLayers((ls) => ls.map((l) => (l.id === selectedId ? { ...l, ...patch } : l)));
   }
 
   function addLayer() {
+    snapshot();
     const l = newLayer();
     setLayers((ls) => [...ls, l]);
     setSelectedId(l.id);
@@ -174,9 +242,12 @@ export default function Studio() {
 
   function removeSelected() {
     if (selectedId == null) return;
+    snapshot();
     setLayers((ls) => ls.filter((l) => l.id !== selectedId));
     setSelectedId(null);
   }
+
+  const textEditSnapped = useRef(false);
 
   async function pickImage() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -242,15 +313,21 @@ export default function Studio() {
       layers
         .filter((l) => l.text.trim())
         .forEach((l, i) => {
-          attributes.push(
-            { key: `טקסט ${i + 1}`, value: l.text.trim() },
-            {
-              key: `טקסט ${i + 1} — עיצוב`,
-              value: `פונט ${l.font.name} · צבע ${l.color} · גודל ${l.size}px · מיקום ${Math.round(
-                (l.x / AREA_W) * 100,
-              )}%,${Math.round((l.y / AREA_H) * 100)}% · סיבוב ${l.rotation}°${l.outline ? ' · מתאר' : ''}`,
-            },
-          );
+          const details = [
+            `פונט ${l.font.name}`,
+            `צבע ${l.color}`,
+            `גודל ${l.size}px`,
+            `מיקום ${Math.round((l.x / AREA_W) * 100)}%,${Math.round((l.y / AREA_H) * 100)}%`,
+            l.rotation !== 0 ? `סיבוב ${l.rotation}°` : '',
+            l.bold ? 'מודגש' : '',
+            l.align !== 'center' ? `יישור ${ALIGNS.find((a) => a.key === l.align)?.label}` : '',
+            l.highlight ? `רקע ${l.highlight}` : '',
+            l.spacing > 0 ? `ריווח ${l.spacing}` : '',
+            l.outline ? 'מתאר' : '',
+          ]
+            .filter(Boolean)
+            .join(' · ');
+          attributes.push({ key: `טקסט ${i + 1}`, value: l.text.trim() }, { key: `טקסט ${i + 1} — עיצוב`, value: details });
         });
 
       cart.add({
@@ -271,12 +348,32 @@ export default function Studio() {
     }
   }
 
+  const cart = useCart();
+  const hasDesign = !!cloudUrl || layers.some((l) => l.text.trim());
   const lightShirt = shirt.hex === '#f2f2f2';
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
       <ScrollView contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={st.title}>סטודיו עיצוב</Text>
+        <View style={st.headerRow}>
+          <View style={st.historyRow}>
+            <Pressable
+              onPress={undo}
+              disabled={past.current.length === 0}
+              style={[st.histBtn, past.current.length === 0 && st.histBtnOff]}
+            >
+              <Text style={st.histText}>↩ ביטול</Text>
+            </Pressable>
+            <Pressable
+              onPress={redo}
+              disabled={future.current.length === 0}
+              style={[st.histBtn, future.current.length === 0 && st.histBtnOff]}
+            >
+              <Text style={st.histText}>חזרה ↪</Text>
+            </Pressable>
+          </View>
+          <Text style={st.title}>סטודיו עיצוב</Text>
+        </View>
 
         {/* תצוגה מקדימה */}
         <View style={[st.shirtPreview, { backgroundColor: shirt.hex }]}>
@@ -293,6 +390,7 @@ export default function Studio() {
                 layer={l}
                 selected={l.id === selectedId}
                 onSelect={() => setSelectedId(l.id)}
+                onDragStart={snapshot}
                 onMove={(x, y) => setLayers((ls) => ls.map((li) => (li.id === l.id ? { ...li, x, y } : li)))}
               />
             ))}
@@ -307,7 +405,6 @@ export default function Studio() {
         {layers.length > 0 && <Text style={st.dragHint}>גררו את הטקסט למיקום הרצוי · הקישו לבחירה</Text>}
         {cloudUrl && !uploading && <Text style={st.okText}>✓ העיצוב נשמר בענן</Text>}
 
-        {/* הוספת טקסט / מחיקה */}
         <View style={st.rowSpread}>
           {selected && (
             <Pressable style={st.deleteBtn} onPress={removeSelected}>
@@ -319,18 +416,47 @@ export default function Studio() {
           </Pressable>
         </View>
 
-        {/* עורך הטקסט הנבחר */}
         {selected && (
           <View style={st.editor}>
             <TextInput
               style={[st.input, { fontFamily: selected.font.family }]}
               value={selected.text}
-              onChangeText={(t) => updateSelected({ text: t })}
+              onFocus={() => {
+                if (!textEditSnapped.current) {
+                  snapshot();
+                  textEditSnapped.current = true;
+                }
+              }}
+              onBlur={() => {
+                textEditSnapped.current = false;
+              }}
+              onChangeText={(t) => updateSelected({ text: t }, false)}
               placeholder="כתבו כאן…"
               placeholderTextColor={C.textDim}
               maxLength={60}
               multiline
             />
+
+            {/* מודגש + יישור */}
+            <View style={st.toolRow}>
+              <View style={st.alignGroup}>
+                {ALIGNS.map((a) => (
+                  <Pressable
+                    key={a.key}
+                    onPress={() => updateSelected({ align: a.key })}
+                    style={[st.alignBtn, selected.align === a.key && st.btnActive]}
+                  >
+                    <Text style={[st.sizeText, selected.align === a.key && st.textActive]}>{a.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Pressable
+                onPress={() => updateSelected({ bold: !selected.bold })}
+                style={[st.boldBtn, selected.bold && st.btnActive]}
+              >
+                <Text style={[st.boldText, selected.bold && st.textActive]}>B</Text>
+              </Pressable>
+            </View>
 
             <Text style={st.subLabel}>פונט</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.fontRow}>
@@ -341,11 +467,7 @@ export default function Studio() {
                   style={[st.fontBtn, selected.font.family === f.family && st.btnActive]}
                 >
                   <Text
-                    style={[
-                      st.fontText,
-                      { fontFamily: f.family },
-                      selected.font.family === f.family && st.textActive,
-                    ]}
+                    style={[st.fontText, { fontFamily: f.family }, selected.font.family === f.family && st.textActive]}
                   >
                     {f.name}
                   </Text>
@@ -364,15 +486,34 @@ export default function Studio() {
               ))}
             </View>
 
+            <Text style={st.subLabel}>רקע לטקסט (מרקר)</Text>
+            <View style={st.row}>
+              {HIGHLIGHTS.map((h) => (
+                <Pressable
+                  key={h ?? 'none'}
+                  onPress={() => updateSelected({ highlight: h })}
+                  style={[
+                    st.swatchSm,
+                    h ? { backgroundColor: h } : st.noneSwatch,
+                    selected.highlight === h && st.swatchActive,
+                  ]}
+                >
+                  {!h && <Text style={st.noneText}>✕</Text>}
+                </Pressable>
+              ))}
+            </View>
+
             <View style={st.sliderRow}>
               <Text style={st.sliderValue}>{selected.size}</Text>
               <Slider
                 style={st.slider}
+                inverted={SLIDER_INVERTED}
                 minimumValue={12}
                 maximumValue={64}
                 step={1}
                 value={selected.size}
-                onValueChange={(v) => updateSelected({ size: Math.round(v) })}
+                onSlidingStart={snapshot}
+                onValueChange={(v) => updateSelected({ size: Math.round(v) }, false)}
                 minimumTrackTintColor={C.accent}
                 maximumTrackTintColor={C.border}
                 thumbTintColor={C.accent}
@@ -384,16 +525,36 @@ export default function Studio() {
               <Text style={st.sliderValue}>{selected.rotation}°</Text>
               <Slider
                 style={st.slider}
+                inverted={SLIDER_INVERTED}
                 minimumValue={-45}
                 maximumValue={45}
                 step={1}
                 value={selected.rotation}
-                onValueChange={(v) => updateSelected({ rotation: Math.round(v) })}
+                onSlidingStart={snapshot}
+                onValueChange={(v) => updateSelected({ rotation: Math.round(v) }, false)}
                 minimumTrackTintColor={C.accent}
                 maximumTrackTintColor={C.border}
                 thumbTintColor={C.accent}
               />
               <Text style={st.sliderLabel}>סיבוב</Text>
+            </View>
+
+            <View style={st.sliderRow}>
+              <Text style={st.sliderValue}>{selected.spacing}</Text>
+              <Slider
+                style={st.slider}
+                inverted={SLIDER_INVERTED}
+                minimumValue={0}
+                maximumValue={12}
+                step={1}
+                value={selected.spacing}
+                onSlidingStart={snapshot}
+                onValueChange={(v) => updateSelected({ spacing: Math.round(v) }, false)}
+                minimumTrackTintColor={C.accent}
+                maximumTrackTintColor={C.border}
+                thumbTintColor={C.accent}
+              />
+              <Text style={st.sliderLabel}>ריווח</Text>
             </View>
 
             <Pressable
@@ -405,7 +566,6 @@ export default function Studio() {
           </View>
         )}
 
-        {/* כלי AI */}
         {cloudUrl && !uploading && (
           <>
             <Text style={st.label}>שדרוג העיצוב עם AI</Text>
@@ -435,7 +595,6 @@ export default function Studio() {
           </>
         )}
 
-        {/* צבע חולצה */}
         <Text style={st.label}>צבע החולצה</Text>
         <View style={st.row}>
           {SHIRT_COLORS.map((c) => (
@@ -449,7 +608,6 @@ export default function Studio() {
         </View>
         <Text style={st.hint}>{shirt.name}</Text>
 
-        {/* מידה */}
         <Text style={st.label}>מידה</Text>
         <View style={st.row}>
           {SIZES.map((s) => (
@@ -459,7 +617,6 @@ export default function Studio() {
           ))}
         </View>
 
-        {/* העלאת עיצוב */}
         <Pressable style={st.uploadBtn} onPress={pickImage} disabled={uploading}>
           <Text style={st.uploadBtnText}>{localImg ? 'החלפת תמונה' : 'העלאת עיצוב מהגלריה'}</Text>
         </Pressable>
@@ -479,7 +636,19 @@ export default function Studio() {
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   scroll: { padding: S.md, paddingBottom: S.xl },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { color: C.text, fontSize: 24, fontWeight: '800', textAlign: 'right' },
+  historyRow: { flexDirection: 'row', gap: S.xs },
+  histBtn: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: R.sm,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  histBtnOff: { opacity: 0.35 },
+  histText: { color: C.text, fontSize: 13, fontWeight: '700' },
   shirtPreview: {
     marginTop: S.md,
     height: 360,
@@ -503,12 +672,7 @@ const st = StyleSheet.create({
   printImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   printHint: { fontSize: 14, fontWeight: '600' },
   layerWrap: { position: 'absolute', padding: 4, maxWidth: AREA_W - 8 },
-  layerSelected: {
-    borderWidth: 1,
-    borderColor: C.accent,
-    borderStyle: 'dashed',
-    borderRadius: 4,
-  },
+  layerSelected: { borderWidth: 1, borderColor: C.accent, borderStyle: 'dashed', borderRadius: 4 },
   dragHint: { color: C.textDim, fontSize: 12, textAlign: 'center', marginTop: 6 },
   uploadOverlay: {
     ...(StyleSheet.absoluteFill as object),
@@ -519,18 +683,8 @@ const st = StyleSheet.create({
   },
   uploadText: { color: C.text, fontSize: 15, fontWeight: '600' },
   okText: { color: C.accent, fontSize: 13, fontWeight: '700', marginTop: 6, textAlign: 'center' },
-  rowSpread: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: S.sm,
-    marginTop: S.md,
-  },
-  addTextBtn: {
-    backgroundColor: C.accent,
-    borderRadius: R.full,
-    paddingVertical: 11,
-    paddingHorizontal: 20,
-  },
+  rowSpread: { flexDirection: 'row', justifyContent: 'flex-end', gap: S.sm, marginTop: S.md },
+  addTextBtn: { backgroundColor: C.accent, borderRadius: R.full, paddingVertical: 11, paddingHorizontal: 20 },
   addTextBtnText: { color: C.onAccent, fontSize: 15, fontWeight: '800' },
   deleteBtn: {
     borderWidth: 1.5,
@@ -559,6 +713,33 @@ const st = StyleSheet.create({
     minHeight: 52,
     textAlign: 'right',
   },
+  toolRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: S.sm,
+    marginTop: S.md,
+  },
+  alignGroup: { flexDirection: 'row', gap: S.xs },
+  alignBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: R.sm,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  boldBtn: {
+    width: 42,
+    height: 38,
+    borderRadius: R.sm,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  boldText: { color: C.textDim, fontSize: 17, fontWeight: '900' },
   label: {
     color: C.text,
     fontSize: 16,
@@ -578,8 +759,18 @@ const st = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: S.sm, justifyContent: 'flex-end' },
   fontRow: { gap: S.sm, flexDirection: 'row' },
   swatch: { width: 44, height: 44, borderRadius: R.full, borderWidth: 2, borderColor: C.border },
-  swatchSm: { width: 34, height: 34, borderRadius: R.full, borderWidth: 2, borderColor: C.border },
+  swatchSm: {
+    width: 34,
+    height: 34,
+    borderRadius: R.full,
+    borderWidth: 2,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   swatchActive: { borderColor: C.accent, borderWidth: 3 },
+  noneSwatch: { backgroundColor: C.bg },
+  noneText: { color: C.textDim, fontSize: 14, fontWeight: '800' },
   hint: { color: C.textDim, fontSize: 13, marginTop: 6, textAlign: 'right' },
   sizeBtn: {
     minWidth: 52,
