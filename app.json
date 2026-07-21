@@ -28,8 +28,8 @@
     },
     "plugins": ["expo-router", "expo-image-picker"],
     "extra": {
-      "SHOPIFY_DOMAIN": "elronprint.co.il",
-      "SHOPIFY_STOREFRONT_TOKEN": "",
+      "SHOPIFY_DOMAIN": "mxgb4q-em.myshopify.com",
+      "SHOPIFY_STOREFRONT_TOKEN": "3c91832c815ab1f2484970232d6f0ea1",
       "CLOUDINARY_CLOUD": "dztd5g0p8",
       "CLOUDINARY_PRESET": "elronprint",
       "VERCEL_API_BASE": "https://elronprint-studio-api.vercel.app/api"
