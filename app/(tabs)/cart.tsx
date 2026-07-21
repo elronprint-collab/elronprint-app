@@ -98,15 +98,7 @@ export default function Cart() {
           >
             <Text style={st.backText}>→ המשך קניות</Text>
           </Pressable>
-          <View style={st.headerRow}>
-        <Pressable
-          onPress={() => (router.canGoBack() ? router.back() : router.push('/shop'))}
-          style={st.backBtn}
-        >
-          <Text style={st.backText}>→ המשך קניות</Text>
-        </Pressable>
-        <Text style={st.title}>העגלה שלי</Text>
-      </View>
+          <Text style={st.title}>העגלה שלי</Text>
         </View>
         <View style={st.center}>
           <Text style={st.empty}>העגלה ריקה</Text>
@@ -118,7 +110,15 @@ export default function Cart() {
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <Text style={st.title}>העגלה שלי</Text>
+      <View style={st.headerRow}>
+        <Pressable
+          onPress={() => (router.canGoBack() ? router.back() : router.push('/shop'))}
+          style={st.backBtn}
+        >
+          <Text style={st.backText}>→ המשך קניות</Text>
+        </Pressable>
+        <Text style={st.title}>העגלה שלי</Text>
+      </View>
       <ScrollView contentContainerStyle={st.scroll}>
         {cart.items.map((item) => (
           <View key={item.key} style={st.card}>
