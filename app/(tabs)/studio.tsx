@@ -2,11 +2,12 @@ import Slider from '@react-native-community/slider';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   I18nManager,
+  Modal,
   PanResponder,
   Platform,
   Pressable,
@@ -20,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { reimagine, removeBackground, toDataUrl, upscale } from '../../lib/ai';
 import { useCart } from '../../lib/cart';
 import { uploadImage, uploadRemote } from '../../lib/cloudinary';
-import { fetchCustomProduct } from '../../lib/shopify';
+import { fetchCustomProduct, fetchProducts, isConfigured, Product } from '../../lib/shopify';
 import { C, R, S } from '../../lib/theme';
 
 const SHIRT_COLORS = [
@@ -50,6 +51,8 @@ const TEXT_COLORS = [
 ];
 
 const HIGHLIGHTS: (string | null)[] = [null, '#000000', '#ffffff', '#00fc25', '#ffd400', '#ff3b6b'];
+
+const SYMBOLS = ['❤️', '⚡', '👑', '⭐', '🔥', '😎', '🎉', '🦄', '⚽', '🎸', '💪', '🌈'];
 
 const ALIGNS = [
   { key: 'right', label: 'ימין' },
@@ -249,6 +252,41 @@ export default function Studio() {
 
   const textEditSnapped = useRef(false);
 
+  // השראה מהחנות + זום
+  const [inspiration, setInspiration] = useState<Product[]>([]);
+  const [zoomOpen, setZoomOpen] = useState(false);
+
+  useEffect(() => {
+    if (isConfigured()) {
+      fetchProducts(12)
+        .then(setInspiration)
+        .catch(() => {});
+    }
+  }, []);
+
+  function addSymbol(char: string) {
+    snapshot();
+    const l = { ...newLayer(), text: char, size: 42 };
+    setLayers((ls) => [...ls, l]);
+    setSelectedId(l.id);
+  }
+
+  async function useTemplate(p: Product) {
+    if (!p.image || uploading) return;
+    setLocalImg(p.image);
+    setUploading(true);
+    setCloudUrl(null);
+    try {
+      const url = await uploadRemote(p.image);
+      setCloudUrl(url);
+    } catch {
+      Alert.alert('שגיאה', 'טעינת העיצוב נכשלה, נסו שוב');
+      setLocalImg(null);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function pickImage() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
@@ -401,6 +439,9 @@ export default function Studio() {
               <Text style={st.uploadText}>מעלה את העיצוב…</Text>
             </View>
           )}
+          <Pressable style={st.zoomBtn} onPress={() => setZoomOpen(true)} hitSlop={8}>
+            <Text style={st.zoomBtnText}>🔍</Text>
+          </Pressable>
         </View>
         {layers.length > 0 && <Text style={st.dragHint}>גררו את הטקסט למיקום הרצוי · הקישו לבחירה</Text>}
         {cloudUrl && !uploading && <Text style={st.okText}>✓ העיצוב נשמר בענן</Text>}
@@ -415,6 +456,16 @@ export default function Studio() {
             <Text style={st.addTextBtnText}>+ הוספת טקסט</Text>
           </Pressable>
         </View>
+
+        {/* סמלים מהירים */}
+        <Text style={st.subLabel}>סמלים מהירים</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.fontRow}>
+          {SYMBOLS.map((sym) => (
+            <Pressable key={sym} style={st.symbolBtn} onPress={() => addSymbol(sym)}>
+              <Text style={st.symbolText}>{sym}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
 
         {selected && (
           <View style={st.editor}>
@@ -617,6 +668,23 @@ export default function Studio() {
           ))}
         </View>
 
+        {/* השראה מהעיצובים בחנות */}
+        {inspiration.length > 0 && (
+          <>
+            <Text style={st.label}>התחלה מעיצוב מהחנות</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.fontRow}>
+              {inspiration.map((p) =>
+                p.image ? (
+                  <Pressable key={p.id} style={st.inspoCard} onPress={() => useTemplate(p)}>
+                    <Image source={{ uri: p.image }} style={st.inspoImg} contentFit="cover" />
+                  </Pressable>
+                ) : null,
+              )}
+            </ScrollView>
+            <Text style={st.hint}>בוחרים עיצוב ← לוחצים "עיצוב מחדש ✨" לקבלת גרסה ייחודית משלכם</Text>
+          </>
+        )}
+
         <Pressable style={st.uploadBtn} onPress={pickImage} disabled={uploading}>
           <Text style={st.uploadBtnText}>{localImg ? 'החלפת תמונה' : 'העלאת עיצוב מהגלריה'}</Text>
         </Pressable>
@@ -629,6 +697,64 @@ export default function Studio() {
           {ordering ? <ActivityIndicator color={C.onAccent} /> : <Text style={st.nextBtnText}>המשך להזמנה ←</Text>}
         </Pressable>
       </ScrollView>
+
+      {/* תצוגה מוגדלת */}
+      <Modal visible={zoomOpen} transparent animationType="fade" onRequestClose={() => setZoomOpen(false)}>
+        <Pressable style={st.zoomBackdrop} onPress={() => setZoomOpen(false)}>
+          <View style={[st.zoomShirt, { backgroundColor: shirt.hex }]}>
+            <View style={{ transform: [{ scale: 1.45 }] }}>
+              <View style={[st.printArea, { borderColor: 'transparent' }]}>
+                {localImg && <Image source={{ uri: localImg }} style={st.printImg} contentFit="contain" />}
+                {layers.map((l) => (
+                  <View
+                    key={l.id}
+                    style={[
+                      st.layerWrap,
+                      {
+                        left: l.x,
+                        top: l.y,
+                        transform: [
+                          { translateX: '-50%' as never },
+                          { translateY: '-50%' as never },
+                          { rotate: `${l.rotation}deg` },
+                        ],
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        {
+                          fontFamily: l.font.family,
+                          color: l.color,
+                          fontSize: l.size,
+                          textAlign: l.align,
+                          letterSpacing: l.spacing,
+                          fontWeight: l.bold ? '700' : 'normal',
+                        },
+                        l.highlight != null && {
+                          backgroundColor: l.highlight,
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 3,
+                        },
+                        l.outline && {
+                          textShadowColor: l.color === '#000000' ? '#ffffff' : '#000000',
+                          textShadowRadius: 3,
+                          textShadowOffset: { width: 0, height: 0 },
+                        },
+                      ]}
+                      numberOfLines={3}
+                    >
+                      {l.text}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+          <Text style={st.zoomHint}>הקישו בכל מקום לסגירה</Text>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -674,6 +800,53 @@ const st = StyleSheet.create({
   layerWrap: { position: 'absolute', padding: 4, maxWidth: AREA_W - 8 },
   layerSelected: { borderWidth: 1, borderColor: C.accent, borderStyle: 'dashed', borderRadius: 4 },
   dragHint: { color: C.textDim, fontSize: 12, textAlign: 'center', marginTop: 6 },
+  zoomBtn: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    width: 38,
+    height: 38,
+    borderRadius: R.full,
+    backgroundColor: '#000000aa',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomBtnText: { fontSize: 17 },
+  zoomBackdrop: {
+    flex: 1,
+    backgroundColor: '#000000ee',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomShirt: {
+    width: '92%',
+    height: '72%',
+    borderRadius: R.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  zoomHint: { color: C.textDim, fontSize: 13, marginTop: S.md },
+  symbolBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: R.sm,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  symbolText: { fontSize: 24 },
+  inspoCard: {
+    width: 84,
+    height: 84,
+    borderRadius: R.sm,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  inspoImg: { width: '100%', height: '100%' },
   uploadOverlay: {
     ...(StyleSheet.absoluteFill as object),
     backgroundColor: '#000000aa',
