@@ -127,21 +127,28 @@ function DraggableText({
   selected,
   onSelect,
   onMove,
+  onResize,
   onDragStart,
+  onDragEnd,
 }: {
   layer: Layer;
   selected: boolean;
   onSelect: () => void;
   onMove: (x: number, y: number) => void;
+  onResize: (size: number) => void;
   onDragStart: () => void;
+  onDragEnd: () => void;
 }) {
   const start = useRef({ x: layer.x, y: layer.y });
+  const startSize = useRef(layer.size);
+  const layerRef = useRef(layer);
+  layerRef.current = layer;
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) + Math.abs(g.dy) > 2,
       onPanResponderGrant: () => {
-        start.current = { x: layer.x, y: layer.y };
+        start.current = { x: layerRef.current.x, y: layerRef.current.y };
         onDragStart();
         onSelect();
       },
@@ -150,6 +157,25 @@ function DraggableText({
         const ny = Math.min(AREA_H - 8, Math.max(8, start.current.y + g.dy));
         onMove(nx, ny);
       },
+      onPanResponderRelease: onDragEnd,
+      onPanResponderTerminate: onDragEnd,
+    }),
+  ).current;
+
+  const resizePan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        startSize.current = layerRef.current.size;
+        onDragStart();
+      },
+      onPanResponderMove: (_e, g) => {
+        const next = Math.min(90, Math.max(12, Math.round(startSize.current + g.dy * 0.6)));
+        onResize(next);
+      },
+      onPanResponderRelease: onDragEnd,
+      onPanResponderTerminate: onDragEnd,
     }),
   ).current;
 
@@ -204,6 +230,11 @@ function DraggableText({
       >
         {layer.text}
       </Text>
+      {selected && (
+        <View {...resizePan.panHandlers} style={st.resizeHandle}>
+          <Text style={st.resizeHandleText}>⤢</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -291,6 +322,7 @@ export default function Studio() {
 
   // השראה מהחנות + זום
   const [inspiration, setInspiration] = useState<Product[]>([]);
+  const [scrollLocked, setScrollLocked] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
   const [hue, setHue] = useState(120);
   const [sat, setSat] = useState(100);
@@ -416,6 +448,26 @@ export default function Studio() {
         title: 'חולצה בעיצוב אישי',
         subtitle: `${shirt.name} · ${size}`,
         image: cloudUrl,
+        design: {
+          shirtHex: shirt.hex,
+          image: cloudUrl,
+          layers: layers
+            .filter((l) => l.text.trim())
+            .map((l) => ({
+              text: l.text,
+              fontFamily: l.font.family,
+              color: l.color,
+              size: l.size,
+              x: l.x,
+              y: l.y,
+              rotation: l.rotation,
+              align: l.align,
+              spacing: l.spacing,
+              bold: l.bold,
+              highlight: l.highlight,
+              outline: l.outline,
+            })),
+        },
         price: Number(variant.price),
         currency: variant.currency,
         quantity: 1,
@@ -435,9 +487,16 @@ export default function Studio() {
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={st.scroll}
+        keyboardShouldPersistTaps="handled"
+        scrollEnabled={!scrollLocked}
+      >
         <View style={st.headerRow}>
           <View style={st.historyRow}>
+            <Pressable onPress={() => router.push('/')} style={st.histBtn}>
+              <Text style={st.histText}>⌂ בית</Text>
+            </Pressable>
             <Pressable
               onPress={undo}
               disabled={past.current.length === 0}
@@ -471,8 +530,13 @@ export default function Studio() {
                 layer={l}
                 selected={l.id === selectedId}
                 onSelect={() => setSelectedId(l.id)}
-                onDragStart={snapshot}
+                onDragStart={() => {
+                  snapshot();
+                  setScrollLocked(true);
+                }}
+                onDragEnd={() => setScrollLocked(false)}
                 onMove={(x, y) => setLayers((ls) => ls.map((li) => (li.id === l.id ? { ...li, x, y } : li)))}
+                onResize={(sz) => setLayers((ls) => ls.map((li) => (li.id === l.id ? { ...li, size: sz } : li)))}
               />
             ))}
           </View>
@@ -557,7 +621,7 @@ export default function Studio() {
               </Pressable>
             </View>
 
-            <Text style={st.subLabel}>פונט</Text>
+            <Text style={st.subLabel}>פונט — 18 פונטים, גללו הצידה ←</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.fontRow}>
               {FONTS.map((f) => (
                 <Pressable
@@ -574,7 +638,7 @@ export default function Studio() {
               ))}
             </ScrollView>
 
-            <Text style={st.subLabel}>צבע</Text>
+            <Text style={st.subLabel}>צבע — ולכל גוון אחר פתחו את הבורר 🎨</Text>
             <View style={st.row}>
               {TEXT_COLORS.map((c) => (
                 <Pressable
@@ -939,6 +1003,18 @@ const st = StyleSheet.create({
     justifyContent: 'center',
   },
   removeImgText: { color: C.danger, fontSize: 18, fontWeight: '800' },
+  resizeHandle: {
+    position: 'absolute',
+    bottom: -14,
+    left: -14,
+    width: 30,
+    height: 30,
+    borderRadius: R.full,
+    backgroundColor: C.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resizeHandleText: { color: C.onAccent, fontSize: 15, fontWeight: '800' },
   zoomBackdrop: {
     flex: 1,
     backgroundColor: '#000000ee',

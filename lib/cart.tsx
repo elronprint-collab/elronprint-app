@@ -1,9 +1,31 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 
+export type DesignLayer = {
+  text: string;
+  fontFamily: string;
+  color: string;
+  size: number;
+  x: number;
+  y: number;
+  rotation: number;
+  align: 'right' | 'center' | 'left';
+  spacing: number;
+  bold: boolean;
+  highlight: string | null;
+  outline: boolean;
+};
+
+export type CartDesign = {
+  shirtHex: string;
+  image: string | null;
+  layers: DesignLayer[];
+};
+
 export type CartItem = {
   key: string; // variantId + attributes hash
   variantId: string;
+  design?: CartDesign;
   title: string;
   subtitle?: string;
   image: string | null;

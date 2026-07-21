@@ -12,9 +12,54 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useCart } from '../../lib/cart';
+import { router } from 'expo-router';
+import { CartDesign, useCart } from '../../lib/cart';
 import { createCheckout } from '../../lib/shopify';
 import { C, R, S } from '../../lib/theme';
+
+const MINI = 0.34;
+
+function MiniPreview({ design }: { design: CartDesign }) {
+  return (
+    <View style={[st.mini, { backgroundColor: design.shirtHex }]}>
+      <View style={st.miniArea}>
+        {design.image && <Image source={{ uri: design.image }} style={st.miniImg} contentFit="contain" />}
+        {design.layers.map((l, i) => (
+          <View
+            key={i}
+            style={{
+              position: 'absolute',
+              left: l.x * MINI,
+              top: l.y * MINI,
+              transform: [
+                { translateX: '-50%' as never },
+                { translateY: '-50%' as never },
+                { rotate: `${l.rotation}deg` },
+              ],
+            }}
+          >
+            <Text
+              style={[
+                {
+                  fontFamily: l.fontFamily,
+                  color: l.color,
+                  fontSize: Math.max(6, l.size * MINI),
+                  textAlign: l.align,
+                  letterSpacing: l.spacing * MINI,
+                  fontWeight: l.bold ? '700' : 'normal',
+                },
+                l.highlight != null && { backgroundColor: l.highlight, paddingHorizontal: 2 },
+              ]}
+              numberOfLines={2}
+            >
+              {l.text}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
 
 export default function Cart() {
   const cart = useCart();
@@ -46,7 +91,12 @@ export default function Cart() {
   if (cart.items.length === 0) {
     return (
       <SafeAreaView style={st.safe} edges={['top']}>
-        <Text style={st.title}>העגלה שלי</Text>
+        <View style={st.headerRow}>
+          <Pressable onPress={() => router.push('/')} style={st.homeBtn}>
+            <Text style={st.homeText}>⌂ בית</Text>
+          </Pressable>
+          <Text style={st.title}>העגלה שלי</Text>
+        </View>
         <View style={st.center}>
           <Text style={st.empty}>העגלה ריקה</Text>
           <Text style={st.hint}>מעצבים חולצה בסטודיו או בוחרים מהחנות — והיא תופיע כאן</Text>
@@ -57,11 +107,18 @@ export default function Cart() {
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <Text style={st.title}>העגלה שלי</Text>
+      <View style={st.headerRow}>
+        <Pressable onPress={() => router.push('/')} style={st.homeBtn}>
+          <Text style={st.homeText}>⌂ בית</Text>
+        </Pressable>
+        <Text style={st.title}>העגלה שלי</Text>
+      </View>
       <ScrollView contentContainerStyle={st.scroll}>
         {cart.items.map((item) => (
           <View key={item.key} style={st.card}>
-            {item.image ? (
+            {item.design ? (
+              <MiniPreview design={item.design} />
+            ) : item.image ? (
               <Image source={{ uri: item.image }} style={st.thumb} contentFit="cover" />
             ) : (
               <View style={[st.thumb, st.noThumb]} />
@@ -69,9 +126,13 @@ export default function Cart() {
             <View style={st.info}>
               <Text style={st.itemTitle} numberOfLines={2}>{item.title}</Text>
               {item.subtitle ? <Text style={st.itemSub}>{item.subtitle}</Text> : null}
-              {item.attributes?.map((a) => (
-                <Text key={a.key} style={st.itemSub}>{a.key}: {a.value.startsWith('http') ? 'צורף ✓' : a.value}</Text>
-              ))}
+              {item.attributes
+                ?.filter((a) => !a.key.includes('—') && !a.value.startsWith('http') && a.key !== 'צבע חולצה' && a.key !== 'מידה')
+                .map((a) => (
+                  <Text key={a.key} style={st.itemSub} numberOfLines={1}>
+                    {a.key}: {a.value}
+                  </Text>
+                ))}
               <Text style={st.itemPrice}>{item.currency}{item.price * item.quantity}</Text>
             </View>
             <View style={st.qtyCol}>
@@ -113,7 +174,32 @@ export default function Cart() {
 
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
-  title: { color: C.text, fontSize: 24, fontWeight: '800', textAlign: 'right', padding: S.md },
+  title: { color: C.text, fontSize: 24, fontWeight: '800', textAlign: 'right' },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: S.md,
+  },
+  homeBtn: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: R.sm,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  homeText: { color: C.text, fontSize: 13, fontWeight: '700' },
+  mini: {
+    width: 86,
+    height: 104,
+    borderRadius: R.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  miniArea: { width: 230 * 0.34, height: 280 * 0.34 },
+  miniImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: S.lg },
   empty: { color: C.text, fontSize: 18, fontWeight: '700' },
   hint: { color: C.textDim, fontSize: 14, textAlign: 'center', marginTop: S.sm, lineHeight: 22 },
