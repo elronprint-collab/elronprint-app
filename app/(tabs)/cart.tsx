@@ -92,13 +92,13 @@ export default function Cart() {
     return (
       <SafeAreaView style={st.safe} edges={['top']}>
         <View style={st.headerRow}>
+          <Text style={st.title}>העגלה שלי</Text>
           <Pressable
             onPress={() => (router.canGoBack() ? router.back() : router.push('/shop'))}
             style={st.backBtn}
           >
             <Text style={st.backText}>→ המשך קניות</Text>
           </Pressable>
-          <Text style={st.title}>העגלה שלי</Text>
         </View>
         <View style={st.center}>
           <Text style={st.empty}>העגלה ריקה</Text>
@@ -111,13 +111,13 @@ export default function Cart() {
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
       <View style={st.headerRow}>
+        <Text style={st.title}>העגלה שלי</Text>
         <Pressable
           onPress={() => (router.canGoBack() ? router.back() : router.push('/shop'))}
           style={st.backBtn}
         >
           <Text style={st.backText}>→ המשך קניות</Text>
         </Pressable>
-        <Text style={st.title}>העגלה שלי</Text>
       </View>
       <ScrollView contentContainerStyle={st.scroll}>
         {cart.items.map((item) => (
@@ -195,15 +195,6 @@ const st = StyleSheet.create({
     alignItems: 'center',
     padding: S.md,
   },
-  homeBtn: {
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: R.sm,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  homeText: { color: C.text, fontSize: 13, fontWeight: '700' },
   mini: {
     width: 86,
     height: 104,

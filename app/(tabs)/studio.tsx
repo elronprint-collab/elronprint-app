@@ -2,7 +2,7 @@ import Slider from '@react-native-community/slider';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -122,6 +122,37 @@ function newLayer(): Layer {
   };
 }
 
+// גרירת עכבר לידית ההגדלה — נדרש רק בדפדפן מחשב (PanResponder של רקטיב-נייטיב מיועד למגע)
+function webResizeHandlers(
+  layerRef: MutableRefObject<Layer>,
+  onResize: (size: number) => void,
+  onDragStart: () => void,
+  onDragEnd: () => void,
+) {
+  return {
+    onMouseDown: (e: any) => {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+      const startSize = layerRef.current.size;
+      const startX = e.clientX;
+      const startY = e.clientY;
+      onDragStart();
+      const onMove = (ev: MouseEvent) => {
+        const delta = (ev.clientY - startY + -(ev.clientX - startX)) / 2;
+        const next = Math.min(96, Math.max(12, Math.round(startSize + delta * 0.7)));
+        onResize(next);
+      };
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        onDragEnd();
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+  };
+}
+
 function DraggableText({
   layer,
   selected,
@@ -237,7 +268,10 @@ function DraggableText({
         {layer.text}
       </Text>
       {selected && (
-        <View {...resizePan.panHandlers} style={st.resizeHandle}>
+        <View
+          {...(Platform.OS === 'web' ? webResizeHandlers(layerRef, onResize, onDragStart, onDragEnd) : resizePan.panHandlers)}
+          style={st.resizeHandle}
+        >
           <Text style={st.resizeHandleText}>⤢</Text>
         </View>
       )}
@@ -499,7 +533,15 @@ export default function Studio() {
         scrollEnabled={!scrollLocked}
       >
         <View style={st.headerRow}>
+          <Text style={st.title}>סטודיו עיצוב</Text>
           <View style={st.historyRow}>
+            <Pressable
+              onPress={() => (router.canGoBack() ? router.back() : router.push('/'))}
+              style={st.arrowBtn}
+              hitSlop={4}
+            >
+              <Text style={st.navArrowText}>→</Text>
+            </Pressable>
             <Pressable
               onPress={undo}
               disabled={past.current.length === 0}
@@ -515,7 +557,6 @@ export default function Studio() {
               <Text style={st.arrowText}>↷</Text>
             </Pressable>
           </View>
-          <Text style={st.title}>סטודיו עיצוב</Text>
         </View>
 
         {/* תצוגה מקדימה */}
@@ -965,6 +1006,7 @@ const st = StyleSheet.create({
     justifyContent: 'center',
   },
   arrowText: { color: C.text, fontSize: 22, fontWeight: '800' },
+  navArrowText: { color: C.accent, fontSize: 20, fontWeight: '800' },
   histText: { color: C.text, fontSize: 13, fontWeight: '700' },
   shirtPreview: {
     marginTop: S.md,

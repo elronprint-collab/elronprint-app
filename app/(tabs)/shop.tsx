@@ -46,7 +46,16 @@ export default function Shop() {
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <Text style={st.title}>החנות</Text>
+      <View style={st.headerRow}>
+        <Text style={st.title}>החנות</Text>
+        <Pressable
+          onPress={() => (router.canGoBack() ? router.back() : router.push('/'))}
+          style={st.backBtn}
+          hitSlop={8}
+        >
+          <Text style={st.backText}>→ חזרה</Text>
+        </Pressable>
+      </View>
       {products === null ? (
         <View style={st.center}>
           <ActivityIndicator color={C.accent} size="large" />
@@ -89,14 +98,14 @@ export default function Shop() {
 
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
-  title: { color: C.text, fontSize: 24, fontWeight: '800', textAlign: 'right', padding: S.md },
+  title: { color: C.text, fontSize: 24, fontWeight: '800', textAlign: 'right' },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: S.md,
   },
-  homeBtn: {
+  backBtn: {
     paddingVertical: 7,
     paddingHorizontal: 12,
     borderRadius: R.sm,
@@ -104,7 +113,7 @@ const st = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
   },
-  homeText: { color: C.text, fontSize: 13, fontWeight: '700' },
+  backText: { color: C.textDim, fontSize: 13, fontWeight: '700' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: S.lg },
   setupTitle: { color: C.text, fontSize: 18, fontWeight: '800', textAlign: 'center' },
   setupText: {

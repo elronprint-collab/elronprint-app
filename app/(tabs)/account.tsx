@@ -9,7 +9,16 @@ const SITE = 'https://elronprint.co.il';
 export default function Account() {
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <Text style={st.title}>החשבון שלי</Text>
+      <View style={st.headerRow}>
+        <Text style={st.title}>החשבון שלי</Text>
+        <Pressable
+          onPress={() => (router.canGoBack() ? router.back() : router.push('/'))}
+          style={st.backBtn}
+          hitSlop={8}
+        >
+          <Text style={st.backText}>→ חזרה</Text>
+        </Pressable>
+      </View>
       <View style={st.center}>
         <Text style={st.hint}>התחברות, הזמנות וטיוטות — יחוברו בשלב הבא</Text>
 
@@ -27,14 +36,14 @@ export default function Account() {
 
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
-  title: { color: C.text, fontSize: 24, fontWeight: '800', textAlign: 'right', padding: S.md },
+  title: { color: C.text, fontSize: 24, fontWeight: '800', textAlign: 'right' },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: S.md,
   },
-  homeBtn: {
+  backBtn: {
     paddingVertical: 7,
     paddingHorizontal: 12,
     borderRadius: R.sm,
@@ -42,7 +51,7 @@ const st = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
   },
-  homeText: { color: C.text, fontSize: 13, fontWeight: '700' },
+  backText: { color: C.textDim, fontSize: 13, fontWeight: '700' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: S.lg },
   hint: { color: C.textDim, fontSize: 14, textAlign: 'center', lineHeight: 22 },
   waBtn: {

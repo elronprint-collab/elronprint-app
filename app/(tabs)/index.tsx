@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { C, R, S } from '../../lib/theme';
@@ -18,8 +18,15 @@ export default function Home() {
       <ScrollView contentContainerStyle={st.scroll}>
         <View style={st.header}>
           <Text style={st.logo}>
-            Elron<Text style={{ color: C.accent }}>Print</Text>
+            אלרון <Text style={{ color: C.accent }}>פרינט</Text>
           </Text>
+          <Pressable
+            onPress={() => router.canGoBack() && router.back()}
+            style={st.backBtn}
+            hitSlop={8}
+          >
+            <Text style={st.backText}>→ חזרה</Text>
+          </Pressable>
         </View>
 
         <View style={st.hero}>
@@ -55,8 +62,23 @@ export default function Home() {
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingBottom: S.xl },
-  header: { paddingHorizontal: S.md, paddingVertical: S.sm },
-  logo: { color: C.text, fontSize: 26, fontWeight: '800', textAlign: 'left' },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: S.md,
+    paddingVertical: S.sm,
+  },
+  logo: { color: C.text, fontSize: 26, fontWeight: '800', textAlign: 'right' },
+  backBtn: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: R.sm,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  backText: { color: C.textDim, fontSize: 13, fontWeight: '700' },
   hero: {
     margin: S.md,
     padding: S.lg,
