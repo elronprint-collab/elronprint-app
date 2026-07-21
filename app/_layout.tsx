@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { I18nManager, Platform } from 'react-native';
+import { CartProvider } from '../lib/cart';
 import { C } from '../lib/theme';
 
 // עברית RTL בכל האפליקציה
@@ -13,7 +14,7 @@ if (Platform.OS === 'web') {
 
 export default function RootLayout() {
   return (
-    <>
+    <CartProvider>
       <StatusBar style="light" />
       <Stack
         screenOptions={{
@@ -21,6 +22,6 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: C.bg },
         }}
       />
-    </>
+    </CartProvider>
   );
 }

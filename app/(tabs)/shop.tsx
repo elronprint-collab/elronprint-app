@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -65,7 +66,7 @@ export default function Shop() {
             </View>
           }
           renderItem={({ item }) => (
-            <Pressable style={st.card}>
+            <Pressable style={st.card} onPress={() => router.push(`/product/${item.handle}`)}>
               {item.image ? (
                 <Image source={{ uri: item.image }} style={st.cardImg} contentFit="cover" />
               ) : (

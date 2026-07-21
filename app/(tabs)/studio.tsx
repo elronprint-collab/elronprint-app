@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,7 +12,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCart } from '../../lib/cart';
 import { uploadImage } from '../../lib/cloudinary';
+import { fetchCustomProduct } from '../../lib/shopify';
 import { C, R, S } from '../../lib/theme';
 
 const SHIRT_COLORS = [
@@ -30,6 +33,43 @@ export default function Studio() {
   const [localImg, setLocalImg] = useState<string | null>(null);
   const [cloudUrl, setCloudUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [ordering, setOrdering] = useState(false);
+  const cart = useCart();
+
+  async function continueToOrder() {
+    if (!cloudUrl || ordering) return;
+    setOrdering(true);
+    try {
+      const product = await fetchCustomProduct();
+      if (!product) throw new Error('מוצר ההדפסה לא נמצא בחנות');
+      const variant =
+        product.variants.find(
+          (v) => v.available && v.options.some((o) => o.value.toUpperCase() === size.toUpperCase()),
+        ) ??
+        product.variants.find((v) => v.available) ??
+        product.variants[0];
+      if (!variant) throw new Error('לא נמצאה וריאציה זמינה');
+      cart.add({
+        variantId: variant.id,
+        title: 'חולצה בעיצוב אישי',
+        subtitle: `${shirt.name} · ${size}`,
+        image: cloudUrl,
+        price: Number(variant.price),
+        currency: variant.currency,
+        quantity: 1,
+        attributes: [
+          { key: 'קובץ עיצוב', value: cloudUrl },
+          { key: 'צבע חולצה', value: shirt.name },
+          { key: 'מידה', value: size },
+        ],
+      });
+      router.push('/cart');
+    } catch (e) {
+      Alert.alert('שגיאה', e instanceof Error ? e.message : 'לא הצלחנו להוסיף לעגלה, נסו שוב');
+    } finally {
+      setOrdering(false);
+    }
+  }
 
   async function pickImage() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -124,11 +164,15 @@ export default function Studio() {
         </Pressable>
 
         <Pressable
-          style={[st.nextBtn, (!cloudUrl || uploading) && st.nextBtnDisabled]}
-          disabled={!cloudUrl || uploading}
-          onPress={() => Alert.alert('בקרוב', 'הוספה לעגלה תחובר לחנות בשלב הבא')}
+          style={[st.nextBtn, (!cloudUrl || uploading || ordering) && st.nextBtnDisabled]}
+          disabled={!cloudUrl || uploading || ordering}
+          onPress={continueToOrder}
         >
-          <Text style={st.nextBtnText}>המשך להזמנה ←</Text>
+          {ordering ? (
+            <ActivityIndicator color={C.onAccent} />
+          ) : (
+            <Text style={st.nextBtnText}>המשך להזמנה ←</Text>
+          )}
         </Pressable>
       </ScrollView>
     </SafeAreaView>
