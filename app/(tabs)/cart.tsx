@@ -94,7 +94,7 @@ export default function Cart() {
         <View style={st.headerRow}>
           <Text style={st.title}>העגלה שלי</Text>
           <Pressable
-            onPress={() => (router.canGoBack() ? router.back() : router.push('/shop'))}
+            onPress={() => router.push('/shop')}
             style={st.backBtn}
           >
             <Text style={st.backText}>→ המשך קניות</Text>
@@ -113,7 +113,7 @@ export default function Cart() {
       <View style={st.headerRow}>
         <Text style={st.title}>העגלה שלי</Text>
         <Pressable
-          onPress={() => (router.canGoBack() ? router.back() : router.push('/shop'))}
+          onPress={() => router.push('/shop')}
           style={st.backBtn}
         >
           <Text style={st.backText}>→ המשך קניות</Text>

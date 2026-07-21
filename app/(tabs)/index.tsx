@@ -20,13 +20,6 @@ export default function Home() {
           <Text style={st.logo}>
             אלרון <Text style={{ color: C.accent }}>פרינט</Text>
           </Text>
-          <Pressable
-            onPress={() => router.canGoBack() && router.back()}
-            style={st.backBtn}
-            hitSlop={8}
-          >
-            <Text style={st.backText}>→ חזרה</Text>
-          </Pressable>
         </View>
 
         <View style={st.hero}>
