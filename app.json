@@ -32,7 +32,8 @@
       "SHOPIFY_STOREFRONT_TOKEN": "3c91832c815ab1f2484970232d6f0ea1",
       "CLOUDINARY_CLOUD": "dztd5g0p8",
       "CLOUDINARY_PRESET": "elronprint",
-      "VERCEL_API_BASE": "https://elronprint-studio-api.vercel.app/api"
+      "VERCEL_API_BASE": "https://elronprint-studio-api.vercel.app/api",
+      "CUSTOM_PRODUCT_QUERY": "הדפסה על חולצות"
     }
   }
 }
