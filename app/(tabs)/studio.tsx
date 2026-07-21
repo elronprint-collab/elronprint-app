@@ -2,7 +2,7 @@ import Slider from '@react-native-community/slider';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -122,37 +122,6 @@ function newLayer(): Layer {
   };
 }
 
-// גרירת עכבר לידית ההגדלה — נדרש רק בדפדפן מחשב (PanResponder של רקטיב-נייטיב מיועד למגע)
-function webResizeHandlers(
-  layerRef: MutableRefObject<Layer>,
-  onResize: (size: number) => void,
-  onDragStart: () => void,
-  onDragEnd: () => void,
-) {
-  return {
-    onMouseDown: (e: any) => {
-      e.preventDefault?.();
-      e.stopPropagation?.();
-      const startSize = layerRef.current.size;
-      const startX = e.clientX;
-      const startY = e.clientY;
-      onDragStart();
-      const onMove = (ev: MouseEvent) => {
-        const delta = (ev.clientY - startY + -(ev.clientX - startX)) / 2;
-        const next = Math.min(96, Math.max(12, Math.round(startSize + delta * 0.7)));
-        onResize(next);
-      };
-      const onUp = () => {
-        window.removeEventListener('mousemove', onMove);
-        window.removeEventListener('mouseup', onUp);
-        onDragEnd();
-      };
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp);
-    },
-  };
-}
-
 function DraggableText({
   layer,
   selected,
@@ -268,10 +237,7 @@ function DraggableText({
         {layer.text}
       </Text>
       {selected && (
-        <View
-          {...(Platform.OS === 'web' ? webResizeHandlers(layerRef, onResize, onDragStart, onDragEnd) : resizePan.panHandlers)}
-          style={st.resizeHandle}
-        >
+        <View {...resizePan.panHandlers} style={st.resizeHandle}>
           <Text style={st.resizeHandleText}>⤢</Text>
         </View>
       )}
