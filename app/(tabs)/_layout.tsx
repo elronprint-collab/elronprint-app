@@ -24,7 +24,7 @@ function CartIcon({ color }: { color: ColorValue }) {
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const bottomPad = Math.max(insets.bottom, 10);
+  const bottomPad = Math.max(insets.bottom, 18);
   return (
     <Tabs
       screenOptions={{
@@ -32,13 +32,13 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: '#0d0d0d',
           borderTopColor: C.border,
-          height: 56 + bottomPad,
+          height: 66 + bottomPad,
           paddingBottom: bottomPad,
-          paddingTop: 6,
+          paddingTop: 8,
         },
         tabBarActiveTintColor: C.accent,
         tabBarInactiveTintColor: C.textDim,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: "700", marginTop: 2 },
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'בית', tabBarIcon: icon('⌂') }} />

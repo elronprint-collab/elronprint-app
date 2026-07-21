@@ -1,10 +1,12 @@
+import Slider from '@react-native-community/slider';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -31,26 +33,117 @@ const SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL'];
 
 const FONTS = [
   { name: 'חיבו', family: 'Heebo' },
+  { name: 'אסיסטנט', family: 'Assistant' },
   { name: 'רוביק', family: 'Rubik' },
+  { name: 'ורלה', family: 'VarelaRound' },
+  { name: 'סואץ', family: 'SuezOne' },
   { name: 'סקולר', family: 'SecularOne' },
+  { name: 'קרנטינה', family: 'Karantina' },
   { name: 'כתב יד', family: 'AmaticSC' },
 ];
 
-const TEXT_COLORS = ['#ffffff', '#000000', '#00fc25', '#ffd400', '#ff3b6b', '#37a7ff'];
-
-const TEXT_SIZES = [
-  { name: 'קטן', px: 16 },
-  { name: 'בינוני', px: 24 },
-  { name: 'גדול', px: 34 },
+const TEXT_COLORS = [
+  '#ffffff', '#000000', '#00fc25', '#ffd400', '#ff3b6b',
+  '#37a7ff', '#ff7a00', '#a259ff', '#00d1c1', '#c0c0c0',
 ];
 
-const POSITIONS = [
-  { name: 'למעלה', key: 'top' },
-  { name: 'באמצע', key: 'center' },
-  { name: 'למטה', key: 'bottom' },
-] as const;
+// אזור ההדפסה בתצוגה
+const AREA_W = 230;
+const AREA_H = 280;
 
-type PositionKey = (typeof POSITIONS)[number]['key'];
+type Layer = {
+  id: number;
+  text: string;
+  font: (typeof FONTS)[number];
+  color: string;
+  size: number; // px
+  x: number; // מרכז, יחסי לאזור
+  y: number;
+  rotation: number; // מעלות
+  outline: boolean;
+};
+
+let nextId = 1;
+
+function newLayer(): Layer {
+  return {
+    id: nextId++,
+    text: 'הטקסט שלי',
+    font: FONTS[0],
+    color: '#ffffff',
+    size: 26,
+    x: AREA_W / 2,
+    y: AREA_H / 2,
+    rotation: 0,
+    outline: false,
+  };
+}
+
+function DraggableText({
+  layer,
+  selected,
+  onSelect,
+  onMove,
+}: {
+  layer: Layer;
+  selected: boolean;
+  onSelect: () => void;
+  onMove: (x: number, y: number) => void;
+}) {
+  const start = useRef({ x: layer.x, y: layer.y });
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) + Math.abs(g.dy) > 2,
+      onPanResponderGrant: () => {
+        start.current = { x: layer.x, y: layer.y };
+        onSelect();
+      },
+      onPanResponderMove: (_e, g) => {
+        const nx = Math.min(AREA_W - 8, Math.max(8, start.current.x + g.dx));
+        const ny = Math.min(AREA_H - 8, Math.max(8, start.current.y + g.dy));
+        onMove(nx, ny);
+      },
+    }),
+  ).current;
+
+  // עדכון נקודת ההתחלה כשהשכבה זזה מבחוץ
+  start.current = selected ? start.current : { x: layer.x, y: layer.y };
+
+  return (
+    <View
+      {...pan.panHandlers}
+      style={[
+        st.layerWrap,
+        {
+          left: layer.x,
+          top: layer.y,
+          transform: [{ translateX: '-50%' as never }, { translateY: '-50%' as never }, { rotate: `${layer.rotation}deg` }],
+        },
+        selected && st.layerSelected,
+      ]}
+    >
+      <Text
+        style={[
+          {
+            fontFamily: layer.font.family,
+            color: layer.color,
+            fontSize: layer.size,
+            textAlign: 'center',
+          },
+          layer.outline && {
+            textShadowColor: layer.color === '#000000' ? '#ffffff' : '#000000',
+            textShadowRadius: 3,
+            textShadowOffset: { width: 0, height: 0 },
+          },
+        ]}
+        numberOfLines={3}
+      >
+        {layer.text}
+      </Text>
+    </View>
+  );
+}
 
 export default function Studio() {
   const [shirt, setShirt] = useState(SHIRT_COLORS[0]);
@@ -59,43 +152,30 @@ export default function Studio() {
   const [cloudUrl, setCloudUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [ordering, setOrdering] = useState(false);
-
-  // כלי הטקסט
-  const [text, setText] = useState('');
-  const [font, setFont] = useState(FONTS[0]);
-  const [textColor, setTextColor] = useState(TEXT_COLORS[0]);
-  const [textSize, setTextSize] = useState(TEXT_SIZES[1]);
-  const [position, setPosition] = useState<PositionKey>('bottom');
-
-  const cart = useCart();
-  const hasDesign = !!cloudUrl || text.trim().length > 0;
-
   const [aiBusy, setAiBusy] = useState<null | 'bg' | 'up' | 'remix'>(null);
 
-  async function runAi(kind: 'bg' | 'up' | 'remix') {
-    if (!cloudUrl || aiBusy || uploading) return;
-    setAiBusy(kind);
-    try {
-      let resultUrl: string;
-      if (kind === 'up') {
-        resultUrl = await upscale(cloudUrl);
-      } else if (kind === 'bg') {
-        resultUrl = await removeBackground(cloudUrl);
-      } else {
-        const dataUrl = await toDataUrl(localImg ?? cloudUrl);
-        resultUrl = await reimagine(dataUrl);
-      }
-      // שמירה קבועה בענן של אלרון פרינט (אם נכשל — נשתמש בקישור הזמני)
-      try {
-        resultUrl = await uploadRemote(resultUrl);
-      } catch {}
-      setLocalImg(resultUrl);
-      setCloudUrl(resultUrl);
-    } catch (e) {
-      Alert.alert('שגיאה', e instanceof Error ? e.message : 'הפעולה נכשלה, נסו שוב');
-    } finally {
-      setAiBusy(null);
-    }
+  const [layers, setLayers] = useState<Layer[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const selected = layers.find((l) => l.id === selectedId) ?? null;
+
+  const cart = useCart();
+  const hasDesign = !!cloudUrl || layers.some((l) => l.text.trim());
+
+  function updateSelected(patch: Partial<Layer>) {
+    if (selectedId == null) return;
+    setLayers((ls) => ls.map((l) => (l.id === selectedId ? { ...l, ...patch } : l)));
+  }
+
+  function addLayer() {
+    const l = newLayer();
+    setLayers((ls) => [...ls, l]);
+    setSelectedId(l.id);
+  }
+
+  function removeSelected() {
+    if (selectedId == null) return;
+    setLayers((ls) => ls.filter((l) => l.id !== selectedId));
+    setSelectedId(null);
   }
 
   async function pickImage() {
@@ -104,12 +184,8 @@ export default function Studio() {
       Alert.alert('אין גישה לגלריה', 'אפשרו גישה בהגדרות כדי להעלות עיצוב');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.9,
-    });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 });
     if (result.canceled || !result.assets?.[0]) return;
-
     const uri = result.assets[0].uri;
     setLocalImg(uri);
     setUploading(true);
@@ -121,6 +197,26 @@ export default function Studio() {
       Alert.alert('שגיאה', 'העלאת התמונה נכשלה. בדקו חיבור לאינטרנט ונסו שוב.');
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function runAi(kind: 'bg' | 'up' | 'remix') {
+    if (!cloudUrl || aiBusy || uploading) return;
+    setAiBusy(kind);
+    try {
+      let resultUrl: string;
+      if (kind === 'up') resultUrl = await upscale(cloudUrl);
+      else if (kind === 'bg') resultUrl = await removeBackground(cloudUrl);
+      else resultUrl = await reimagine(await toDataUrl(localImg ?? cloudUrl));
+      try {
+        resultUrl = await uploadRemote(resultUrl);
+      } catch {}
+      setLocalImg(resultUrl);
+      setCloudUrl(resultUrl);
+    } catch (e) {
+      Alert.alert('שגיאה', e instanceof Error ? e.message : 'הפעולה נכשלה, נסו שוב');
+    } finally {
+      setAiBusy(null);
     }
   }
 
@@ -143,15 +239,19 @@ export default function Studio() {
         { key: 'מידה', value: size },
       ];
       if (cloudUrl) attributes.push({ key: 'קובץ עיצוב', value: cloudUrl });
-      if (text.trim()) {
-        attributes.push(
-          { key: 'טקסט להדפסה', value: text.trim() },
-          { key: 'פונט', value: font.name },
-          { key: 'צבע טקסט', value: textColor },
-          { key: 'גודל טקסט', value: textSize.name },
-          { key: 'מיקום טקסט', value: POSITIONS.find((p) => p.key === position)?.name ?? '' },
-        );
-      }
+      layers
+        .filter((l) => l.text.trim())
+        .forEach((l, i) => {
+          attributes.push(
+            { key: `טקסט ${i + 1}`, value: l.text.trim() },
+            {
+              key: `טקסט ${i + 1} — עיצוב`,
+              value: `פונט ${l.font.name} · צבע ${l.color} · גודל ${l.size}px · מיקום ${Math.round(
+                (l.x / AREA_W) * 100,
+              )}%,${Math.round((l.y / AREA_H) * 100)}% · סיבוב ${l.rotation}°${l.outline ? ' · מתאר' : ''}`,
+            },
+          );
+        });
 
       cart.add({
         variantId: variant.id,
@@ -181,31 +281,21 @@ export default function Studio() {
         {/* תצוגה מקדימה */}
         <View style={[st.shirtPreview, { backgroundColor: shirt.hex }]}>
           <View style={[st.printArea, { borderColor: lightShirt ? '#00000022' : '#ffffff22' }]}>
-            {localImg ? (
-              <Image source={{ uri: localImg }} style={st.printImg} contentFit="contain" />
-            ) : !text.trim() ? (
+            {localImg && <Image source={{ uri: localImg }} style={st.printImg} contentFit="contain" />}
+            {!localImg && layers.length === 0 && (
               <Text style={[st.printHint, { color: lightShirt ? '#00000066' : '#ffffff66' }]}>
                 אזור ההדפסה
               </Text>
-            ) : null}
-            {text.trim().length > 0 && (
-              <Text
-                style={[
-                  st.overlayText,
-                  {
-                    fontFamily: font.family,
-                    color: textColor,
-                    fontSize: textSize.px,
-                    top: position === 'top' ? 8 : undefined,
-                    bottom: position === 'bottom' ? 8 : undefined,
-                  },
-                  position === 'center' && st.overlayCenter,
-                ]}
-                numberOfLines={3}
-              >
-                {text}
-              </Text>
             )}
+            {layers.map((l) => (
+              <DraggableText
+                key={l.id}
+                layer={l}
+                selected={l.id === selectedId}
+                onSelect={() => setSelectedId(l.id)}
+                onMove={(x, y) => setLayers((ls) => ls.map((li) => (li.id === l.id ? { ...li, x, y } : li)))}
+              />
+            ))}
           </View>
           {uploading && (
             <View style={st.uploadOverlay}>
@@ -214,7 +304,106 @@ export default function Studio() {
             </View>
           )}
         </View>
+        {layers.length > 0 && <Text style={st.dragHint}>גררו את הטקסט למיקום הרצוי · הקישו לבחירה</Text>}
         {cloudUrl && !uploading && <Text style={st.okText}>✓ העיצוב נשמר בענן</Text>}
+
+        {/* הוספת טקסט / מחיקה */}
+        <View style={st.rowSpread}>
+          {selected && (
+            <Pressable style={st.deleteBtn} onPress={removeSelected}>
+              <Text style={st.deleteText}>🗑 מחיקה</Text>
+            </Pressable>
+          )}
+          <Pressable style={st.addTextBtn} onPress={addLayer}>
+            <Text style={st.addTextBtnText}>+ הוספת טקסט</Text>
+          </Pressable>
+        </View>
+
+        {/* עורך הטקסט הנבחר */}
+        {selected && (
+          <View style={st.editor}>
+            <TextInput
+              style={[st.input, { fontFamily: selected.font.family }]}
+              value={selected.text}
+              onChangeText={(t) => updateSelected({ text: t })}
+              placeholder="כתבו כאן…"
+              placeholderTextColor={C.textDim}
+              maxLength={60}
+              multiline
+            />
+
+            <Text style={st.subLabel}>פונט</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.fontRow}>
+              {FONTS.map((f) => (
+                <Pressable
+                  key={f.family}
+                  onPress={() => updateSelected({ font: f })}
+                  style={[st.fontBtn, selected.font.family === f.family && st.btnActive]}
+                >
+                  <Text
+                    style={[
+                      st.fontText,
+                      { fontFamily: f.family },
+                      selected.font.family === f.family && st.textActive,
+                    ]}
+                  >
+                    {f.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            <Text style={st.subLabel}>צבע</Text>
+            <View style={st.row}>
+              {TEXT_COLORS.map((c) => (
+                <Pressable
+                  key={c}
+                  onPress={() => updateSelected({ color: c })}
+                  style={[st.swatchSm, { backgroundColor: c }, selected.color === c && st.swatchActive]}
+                />
+              ))}
+            </View>
+
+            <View style={st.sliderRow}>
+              <Text style={st.sliderValue}>{selected.size}</Text>
+              <Slider
+                style={st.slider}
+                minimumValue={12}
+                maximumValue={64}
+                step={1}
+                value={selected.size}
+                onValueChange={(v) => updateSelected({ size: Math.round(v) })}
+                minimumTrackTintColor={C.accent}
+                maximumTrackTintColor={C.border}
+                thumbTintColor={C.accent}
+              />
+              <Text style={st.sliderLabel}>גודל</Text>
+            </View>
+
+            <View style={st.sliderRow}>
+              <Text style={st.sliderValue}>{selected.rotation}°</Text>
+              <Slider
+                style={st.slider}
+                minimumValue={-45}
+                maximumValue={45}
+                step={1}
+                value={selected.rotation}
+                onValueChange={(v) => updateSelected({ rotation: Math.round(v) })}
+                minimumTrackTintColor={C.accent}
+                maximumTrackTintColor={C.border}
+                thumbTintColor={C.accent}
+              />
+              <Text style={st.sliderLabel}>סיבוב</Text>
+            </View>
+
+            <Pressable
+              style={[st.outlineBtn, selected.outline && st.btnActive]}
+              onPress={() => updateSelected({ outline: !selected.outline })}
+            >
+              <Text style={[st.sizeText, selected.outline && st.textActive]}>קו מתאר לטקסט</Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* כלי AI */}
         {cloudUrl && !uploading && (
@@ -264,85 +453,11 @@ export default function Studio() {
         <Text style={st.label}>מידה</Text>
         <View style={st.row}>
           {SIZES.map((s) => (
-            <Pressable key={s} onPress={() => setSize(s)} style={[st.sizeBtn, size === s && st.sizeBtnActive]}>
-              <Text style={[st.sizeText, size === s && st.sizeTextActive]}>{s}</Text>
+            <Pressable key={s} onPress={() => setSize(s)} style={[st.sizeBtn, size === s && st.btnActive]}>
+              <Text style={[st.sizeText, size === s && st.textActive]}>{s}</Text>
             </Pressable>
           ))}
         </View>
-
-        {/* טקסט על החולצה */}
-        <Text style={st.label}>טקסט על החולצה</Text>
-        <TextInput
-          style={[st.input, { fontFamily: font.family }]}
-          value={text}
-          onChangeText={setText}
-          placeholder="כתבו כאן את הכיתוב…"
-          placeholderTextColor={C.textDim}
-          maxLength={60}
-          multiline
-        />
-
-        {text.trim().length > 0 && (
-          <>
-            <Text style={st.subLabel}>פונט</Text>
-            <View style={st.row}>
-              {FONTS.map((f) => (
-                <Pressable
-                  key={f.family}
-                  onPress={() => setFont(f)}
-                  style={[st.fontBtn, font.family === f.family && st.sizeBtnActive]}
-                >
-                  <Text
-                    style={[st.fontText, { fontFamily: f.family }, font.family === f.family && st.sizeTextActive]}
-                  >
-                    {f.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={st.subLabel}>צבע הטקסט</Text>
-            <View style={st.row}>
-              {TEXT_COLORS.map((c) => (
-                <Pressable
-                  key={c}
-                  onPress={() => setTextColor(c)}
-                  style={[
-                    st.swatchSm,
-                    { backgroundColor: c },
-                    textColor === c && st.swatchActive,
-                  ]}
-                />
-              ))}
-            </View>
-
-            <Text style={st.subLabel}>גודל</Text>
-            <View style={st.row}>
-              {TEXT_SIZES.map((ts) => (
-                <Pressable
-                  key={ts.name}
-                  onPress={() => setTextSize(ts)}
-                  style={[st.sizeBtn, textSize.name === ts.name && st.sizeBtnActive]}
-                >
-                  <Text style={[st.sizeText, textSize.name === ts.name && st.sizeTextActive]}>{ts.name}</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={st.subLabel}>מיקום</Text>
-            <View style={st.row}>
-              {POSITIONS.map((p) => (
-                <Pressable
-                  key={p.key}
-                  onPress={() => setPosition(p.key)}
-                  style={[st.sizeBtn, position === p.key && st.sizeBtnActive]}
-                >
-                  <Text style={[st.sizeText, position === p.key && st.sizeTextActive]}>{p.name}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </>
-        )}
 
         {/* העלאת עיצוב */}
         <Pressable style={st.uploadBtn} onPress={pickImage} disabled={uploading}>
@@ -354,11 +469,7 @@ export default function Studio() {
           disabled={!hasDesign || uploading || ordering}
           onPress={continueToOrder}
         >
-          {ordering ? (
-            <ActivityIndicator color={C.onAccent} />
-          ) : (
-            <Text style={st.nextBtnText}>המשך להזמנה ←</Text>
-          )}
+          {ordering ? <ActivityIndicator color={C.onAccent} /> : <Text style={st.nextBtnText}>המשך להזמנה ←</Text>}
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -371,7 +482,7 @@ const st = StyleSheet.create({
   title: { color: C.text, fontSize: 24, fontWeight: '800', textAlign: 'right' },
   shirtPreview: {
     marginTop: S.md,
-    height: 320,
+    height: 360,
     borderRadius: R.lg,
     alignItems: 'center',
     justifyContent: 'center',
@@ -380,8 +491,8 @@ const st = StyleSheet.create({
     overflow: 'hidden',
   },
   printArea: {
-    width: 190,
-    height: 230,
+    width: AREA_W,
+    height: AREA_H,
     borderWidth: 1.5,
     borderStyle: 'dashed',
     borderRadius: R.sm,
@@ -389,15 +500,16 @@ const st = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  printImg: { width: '100%', height: '100%' },
+  printImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   printHint: { fontSize: 14, fontWeight: '600' },
-  overlayText: {
-    position: 'absolute',
-    left: 4,
-    right: 4,
-    textAlign: 'center',
+  layerWrap: { position: 'absolute', padding: 4, maxWidth: AREA_W - 8 },
+  layerSelected: {
+    borderWidth: 1,
+    borderColor: C.accent,
+    borderStyle: 'dashed',
+    borderRadius: 4,
   },
-  overlayCenter: { top: '42%' },
+  dragHint: { color: C.textDim, fontSize: 12, textAlign: 'center', marginTop: 6 },
   uploadOverlay: {
     ...(StyleSheet.absoluteFill as object),
     backgroundColor: '#000000aa',
@@ -406,7 +518,47 @@ const st = StyleSheet.create({
     gap: S.sm,
   },
   uploadText: { color: C.text, fontSize: 15, fontWeight: '600' },
-  okText: { color: C.accent, fontSize: 13, fontWeight: '700', marginTop: S.sm, textAlign: 'center' },
+  okText: { color: C.accent, fontSize: 13, fontWeight: '700', marginTop: 6, textAlign: 'center' },
+  rowSpread: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: S.sm,
+    marginTop: S.md,
+  },
+  addTextBtn: {
+    backgroundColor: C.accent,
+    borderRadius: R.full,
+    paddingVertical: 11,
+    paddingHorizontal: 20,
+  },
+  addTextBtnText: { color: C.onAccent, fontSize: 15, fontWeight: '800' },
+  deleteBtn: {
+    borderWidth: 1.5,
+    borderColor: C.danger,
+    borderRadius: R.full,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+  },
+  deleteText: { color: C.danger, fontSize: 14, fontWeight: '800' },
+  editor: {
+    marginTop: S.md,
+    backgroundColor: C.surface,
+    borderRadius: R.md,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: S.md,
+  },
+  input: {
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: R.md,
+    color: C.text,
+    fontSize: 17,
+    padding: S.md,
+    minHeight: 52,
+    textAlign: 'right',
+  },
   label: {
     color: C.text,
     fontSize: 16,
@@ -417,15 +569,16 @@ const st = StyleSheet.create({
   },
   subLabel: {
     color: C.textDim,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     marginTop: S.md,
     marginBottom: S.sm,
     textAlign: 'right',
   },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: S.sm, justifyContent: 'flex-end' },
+  fontRow: { gap: S.sm, flexDirection: 'row' },
   swatch: { width: 44, height: 44, borderRadius: R.full, borderWidth: 2, borderColor: C.border },
-  swatchSm: { width: 36, height: 36, borderRadius: R.full, borderWidth: 2, borderColor: C.border },
+  swatchSm: { width: 34, height: 34, borderRadius: R.full, borderWidth: 2, borderColor: C.border },
   swatchActive: { borderColor: C.accent, borderWidth: 3 },
   hint: { color: C.textDim, fontSize: 13, marginTop: 6, textAlign: 'right' },
   sizeBtn: {
@@ -438,9 +591,32 @@ const st = StyleSheet.create({
     borderColor: C.border,
     alignItems: 'center',
   },
-  sizeBtnActive: { borderColor: C.accent, backgroundColor: C.surfaceHi },
+  btnActive: { borderColor: C.accent, backgroundColor: C.surfaceHi },
   sizeText: { color: C.textDim, fontSize: 15, fontWeight: '700' },
-  sizeTextActive: { color: C.accent },
+  textActive: { color: C.accent },
+  fontBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: R.sm,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+  },
+  fontText: { color: C.textDim, fontSize: 16 },
+  sliderRow: { flexDirection: 'row', alignItems: 'center', marginTop: S.md, gap: S.sm },
+  slider: { flex: 1, height: 36 },
+  sliderLabel: { color: C.text, fontSize: 14, fontWeight: '700', width: 44, textAlign: 'right' },
+  sliderValue: { color: C.accent, fontSize: 13, fontWeight: '800', width: 40 },
+  outlineBtn: {
+    marginTop: S.md,
+    paddingVertical: 10,
+    borderRadius: R.sm,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+  },
   aiBtn: {
     paddingVertical: 11,
     paddingHorizontal: 16,
@@ -453,27 +629,6 @@ const st = StyleSheet.create({
   },
   aiBtnBusy: { opacity: 0.7 },
   aiBtnText: { color: C.accent, fontSize: 14, fontWeight: '800' },
-  fontBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: R.sm,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.border,
-    alignItems: 'center',
-  },
-  fontText: { color: C.textDim, fontSize: 16 },
-  input: {
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: R.md,
-    color: C.text,
-    fontSize: 17,
-    padding: S.md,
-    minHeight: 56,
-    textAlign: 'right',
-  },
   uploadBtn: {
     marginTop: S.xl,
     borderRadius: R.full,

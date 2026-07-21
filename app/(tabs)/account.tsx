@@ -2,17 +2,22 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { C, R, S } from '../../lib/theme';
 
+const WHATSAPP = 'https://wa.me/972545998990';
+const SITE = 'https://elronprint.co.il';
+
 export default function Account() {
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
       <Text style={st.title}>החשבון שלי</Text>
       <View style={st.center}>
         <Text style={st.hint}>התחברות, הזמנות וטיוטות — יחוברו בשלב הבא</Text>
-        <Pressable
-          style={st.waBtn}
-          onPress={() => Linking.openURL('https://elronprint.co.il')}
-        >
-          <Text style={st.waText}>שירות לקוחות</Text>
+
+        <Pressable style={st.waBtn} onPress={() => Linking.openURL(WHATSAPP)}>
+          <Text style={st.waText}>💬 שירות לקוחות בוואטסאפ</Text>
+        </Pressable>
+
+        <Pressable style={st.siteBtn} onPress={() => Linking.openURL(SITE)}>
+          <Text style={st.siteText}>לאתר elronprint.co.il</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -26,11 +31,19 @@ const st = StyleSheet.create({
   hint: { color: C.textDim, fontSize: 14, textAlign: 'center', lineHeight: 22 },
   waBtn: {
     marginTop: S.lg,
+    backgroundColor: C.accent,
+    borderRadius: R.full,
+    paddingVertical: 14,
+    paddingHorizontal: S.xl,
+  },
+  waText: { color: C.onAccent, fontSize: 16, fontWeight: '800' },
+  siteBtn: {
+    marginTop: S.md,
     borderWidth: 1.5,
     borderColor: C.accent,
     borderRadius: R.full,
     paddingVertical: 12,
     paddingHorizontal: S.xl,
   },
-  waText: { color: C.accent, fontSize: 16, fontWeight: '800' },
+  siteText: { color: C.accent, fontSize: 15, fontWeight: '800' },
 });

@@ -25,6 +25,10 @@ export default function RootLayout() {
     Rubik: require('../assets/fonts/Rubik.ttf'),
     SecularOne: require('../assets/fonts/SecularOne.ttf'),
     AmaticSC: require('../assets/fonts/AmaticSC.ttf'),
+    Assistant: require('../assets/fonts/Assistant.ttf'),
+    VarelaRound: require('../assets/fonts/VarelaRound.ttf'),
+    SuezOne: require('../assets/fonts/SuezOne.ttf'),
+    Karantina: require('../assets/fonts/Karantina.ttf'),
   });
 
   if (!fontsLoaded) {
