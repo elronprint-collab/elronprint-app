@@ -29,6 +29,16 @@ export default function RootLayout() {
     VarelaRound: require('../assets/fonts/VarelaRound.ttf'),
     SuezOne: require('../assets/fonts/SuezOne.ttf'),
     Karantina: require('../assets/fonts/Karantina.ttf'),
+    Alef: require('../assets/fonts/Alef.ttf'),
+    FrankRuhl: require('../assets/fonts/FrankRuhl.ttf'),
+    DavidLibre: require('../assets/fonts/DavidLibre.ttf'),
+    MiriamLibre: require('../assets/fonts/MiriamLibre.ttf'),
+    Bellefair: require('../assets/fonts/Bellefair.ttf'),
+    PlexHebrew: require('../assets/fonts/PlexHebrew.ttf'),
+    Solitreo: require('../assets/fonts/Solitreo.ttf'),
+    NotoHebrew: require('../assets/fonts/NotoHebrew.ttf'),
+    NotoSerif: require('../assets/fonts/NotoSerif.ttf'),
+    Rashi: require('../assets/fonts/Rashi.ttf'),
   });
 
   if (!fontsLoaded) {

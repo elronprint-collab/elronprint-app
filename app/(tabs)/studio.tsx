@@ -43,7 +43,27 @@ const FONTS = [
   { name: 'סקולר', family: 'SecularOne' },
   { name: 'קרנטינה', family: 'Karantina' },
   { name: 'כתב יד', family: 'AmaticSC' },
+  { name: 'אלף', family: 'Alef' },
+  { name: 'פרנק ריהל', family: 'FrankRuhl' },
+  { name: 'דוד', family: 'DavidLibre' },
+  { name: 'מרים', family: 'MiriamLibre' },
+  { name: 'בלפייר', family: 'Bellefair' },
+  { name: 'פלקס', family: 'PlexHebrew' },
+  { name: 'נוטו', family: 'NotoHebrew' },
+  { name: 'נוטו סריף', family: 'NotoSerif' },
+  { name: 'רש"י', family: 'Rashi' },
+  { name: 'רהוט', family: 'Solitreo' },
 ];
+
+function hslToHex(h: number, s: number, l: number): string {
+  const sat = s / 100;
+  const lig = l / 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = sat * Math.min(lig, 1 - lig);
+  const f = (n: number) => lig - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const toHex = (x: number) => Math.round(255 * x).toString(16).padStart(2, '0');
+  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
+}
 
 const TEXT_COLORS = [
   '#ffffff', '#000000', '#00fc25', '#ffd400', '#ff3b6b',
@@ -202,12 +222,24 @@ export default function Studio() {
   const selected = layers.find((l) => l.id === selectedId) ?? null;
 
   // ביטול / חזרה
-  const past = useRef<Layer[][]>([]);
-  const future = useRef<Layer[][]>([]);
+  type Snap = { layers: Layer[]; localImg: string | null; cloudUrl: string | null };
+  const past = useRef<Snap[]>([]);
+  const future = useRef<Snap[]>([]);
   const [, forceHistory] = useState(0);
 
+  function currentSnap(): Snap {
+    return { layers: layers.map((l) => ({ ...l })), localImg, cloudUrl };
+  }
+
+  function applySnap(sn: Snap) {
+    setLayers(sn.layers);
+    setLocalImg(sn.localImg);
+    setCloudUrl(sn.cloudUrl);
+    if (selectedId != null && !sn.layers.some((l) => l.id === selectedId)) setSelectedId(null);
+  }
+
   function snapshot() {
-    past.current.push(layers.map((l) => ({ ...l })));
+    past.current.push(currentSnap());
     if (past.current.length > 40) past.current.shift();
     future.current = [];
     forceHistory((n) => n + 1);
@@ -216,18 +248,23 @@ export default function Studio() {
   function undo() {
     const prev = past.current.pop();
     if (!prev) return;
-    future.current.push(layers.map((l) => ({ ...l })));
-    setLayers(prev);
-    if (selectedId != null && !prev.some((l) => l.id === selectedId)) setSelectedId(null);
+    future.current.push(currentSnap());
+    applySnap(prev);
     forceHistory((n) => n + 1);
   }
 
   function redo() {
     const next = future.current.pop();
     if (!next) return;
-    past.current.push(layers.map((l) => ({ ...l })));
-    setLayers(next);
+    past.current.push(currentSnap());
+    applySnap(next);
     forceHistory((n) => n + 1);
+  }
+
+  function removeImage() {
+    snapshot();
+    setLocalImg(null);
+    setCloudUrl(null);
   }
 
   function updateSelected(patch: Partial<Layer>, withSnapshot = true) {
@@ -254,6 +291,10 @@ export default function Studio() {
 
   // השראה מהחנות + זום
   const [inspiration, setInspiration] = useState<Product[]>([]);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [hue, setHue] = useState(120);
+  const [sat, setSat] = useState(100);
+  const [light, setLight] = useState(50);
   const [zoomOpen, setZoomOpen] = useState(false);
 
   useEffect(() => {
@@ -273,6 +314,7 @@ export default function Studio() {
 
   async function useTemplate(p: Product) {
     if (!p.image || uploading) return;
+    snapshot();
     setLocalImg(p.image);
     setUploading(true);
     setCloudUrl(null);
@@ -296,6 +338,7 @@ export default function Studio() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 });
     if (result.canceled || !result.assets?.[0]) return;
     const uri = result.assets[0].uri;
+    snapshot();
     setLocalImg(uri);
     setUploading(true);
     setCloudUrl(null);
@@ -442,6 +485,11 @@ export default function Studio() {
           <Pressable style={st.zoomBtn} onPress={() => setZoomOpen(true)} hitSlop={8}>
             <Text style={st.zoomBtnText}>🔍</Text>
           </Pressable>
+          {localImg && !uploading && (
+            <Pressable style={st.removeImgBtn} onPress={removeImage} hitSlop={8}>
+              <Text style={st.removeImgText}>✕</Text>
+            </Pressable>
+          )}
         </View>
         {layers.length > 0 && <Text style={st.dragHint}>גררו את הטקסט למיקום הרצוי · הקישו לבחירה</Text>}
         {cloudUrl && !uploading && <Text style={st.okText}>✓ העיצוב נשמר בענן</Text>}
@@ -536,6 +584,71 @@ export default function Studio() {
                 />
               ))}
             </View>
+
+            <Pressable
+              style={[st.outlineBtn, customOpen && st.btnActive]}
+              onPress={() => setCustomOpen((v) => !v)}
+            >
+              <Text style={[st.sizeText, customOpen && st.textActive]}>🎨 כל צבע — בורר חופשי</Text>
+            </Pressable>
+            {customOpen && (
+              <View style={st.customBox}>
+                <View style={st.customHeader}>
+                  <View style={[st.customSwatch, { backgroundColor: hslToHex(hue, sat, light) }]} />
+                  <Pressable
+                    style={st.applyBtn}
+                    onPress={() => updateSelected({ color: hslToHex(hue, sat, light) })}
+                  >
+                    <Text style={st.applyText}>החלת הצבע</Text>
+                  </Pressable>
+                </View>
+                <View style={st.sliderRow}>
+                  <Slider
+                    style={st.slider}
+                    inverted={SLIDER_INVERTED}
+                    minimumValue={0}
+                    maximumValue={360}
+                    step={1}
+                    value={hue}
+                    onValueChange={(v) => setHue(Math.round(v))}
+                    minimumTrackTintColor={hslToHex(hue, 100, 50)}
+                    maximumTrackTintColor={C.border}
+                    thumbTintColor={hslToHex(hue, 100, 50)}
+                  />
+                  <Text style={st.sliderLabel}>גוון</Text>
+                </View>
+                <View style={st.sliderRow}>
+                  <Slider
+                    style={st.slider}
+                    inverted={SLIDER_INVERTED}
+                    minimumValue={0}
+                    maximumValue={100}
+                    step={1}
+                    value={sat}
+                    onValueChange={(v) => setSat(Math.round(v))}
+                    minimumTrackTintColor={C.accent}
+                    maximumTrackTintColor={C.border}
+                    thumbTintColor={C.accent}
+                  />
+                  <Text style={st.sliderLabel}>עוצמה</Text>
+                </View>
+                <View style={st.sliderRow}>
+                  <Slider
+                    style={st.slider}
+                    inverted={SLIDER_INVERTED}
+                    minimumValue={5}
+                    maximumValue={95}
+                    step={1}
+                    value={light}
+                    onValueChange={(v) => setLight(Math.round(v))}
+                    minimumTrackTintColor={C.accent}
+                    maximumTrackTintColor={C.border}
+                    thumbTintColor={C.accent}
+                  />
+                  <Text style={st.sliderLabel}>בהירות</Text>
+                </View>
+              </View>
+            )}
 
             <Text style={st.subLabel}>רקע לטקסט (מרקר)</Text>
             <View style={st.row}>
@@ -812,6 +925,20 @@ const st = StyleSheet.create({
     justifyContent: 'center',
   },
   zoomBtnText: { fontSize: 17 },
+  removeImgBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 38,
+    height: 38,
+    borderRadius: R.full,
+    backgroundColor: '#000000aa',
+    borderWidth: 1.5,
+    borderColor: C.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeImgText: { color: C.danger, fontSize: 18, fontWeight: '800' },
   zoomBackdrop: {
     flex: 1,
     backgroundColor: '#000000ee',
@@ -847,6 +974,18 @@ const st = StyleSheet.create({
     borderColor: C.border,
   },
   inspoImg: { width: '100%', height: '100%' },
+  customBox: {
+    marginTop: S.sm,
+    backgroundColor: C.bg,
+    borderRadius: R.sm,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: S.sm,
+  },
+  customHeader: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: S.sm },
+  customSwatch: { width: 40, height: 40, borderRadius: R.full, borderWidth: 2, borderColor: C.border },
+  applyBtn: { backgroundColor: C.accent, borderRadius: R.full, paddingVertical: 9, paddingHorizontal: 18 },
+  applyText: { color: C.onAccent, fontSize: 14, fontWeight: '800' },
   uploadOverlay: {
     ...(StyleSheet.absoluteFill as object),
     backgroundColor: '#000000aa',
