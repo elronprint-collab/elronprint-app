@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { ColorValue, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCart } from '../../lib/cart';
 import { C } from '../../lib/theme';
 
@@ -22,6 +23,8 @@ function CartIcon({ color }: { color: ColorValue }) {
 }
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  const bottomPad = Math.max(insets.bottom, 10);
   return (
     <Tabs
       screenOptions={{
@@ -29,8 +32,8 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: '#0d0d0d',
           borderTopColor: C.border,
-          height: 62,
-          paddingBottom: 8,
+          height: 56 + bottomPad,
+          paddingBottom: bottomPad,
           paddingTop: 6,
         },
         tabBarActiveTintColor: C.accent,

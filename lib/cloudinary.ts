@@ -19,3 +19,18 @@ export async function uploadImage(localUri: string): Promise<string> {
   const json = await res.json();
   return json.secure_url as string;
 }
+
+// העלאת תמונה מ-URL מרוחק (למשל תוצאת AI) לשמירה קבועה בענן
+export async function uploadRemote(remoteUrl: string): Promise<string> {
+  const form = new FormData();
+  form.append('file', remoteUrl);
+  form.append('upload_preset', PRESET);
+  form.append('folder', 'elronprint-orders');
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/image/upload`, {
+    method: 'POST',
+    body: form,
+  });
+  if (!res.ok) throw new Error('שמירת התוצאה נכשלה');
+  const json = await res.json();
+  return json.secure_url as string;
+}

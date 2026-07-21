@@ -33,7 +33,8 @@
       "CLOUDINARY_CLOUD": "dztd5g0p8",
       "CLOUDINARY_PRESET": "elronprint",
       "VERCEL_API_BASE": "https://elronprint-studio-api.vercel.app/api",
-      "CUSTOM_PRODUCT_QUERY": "הדפסה על חולצות"
+      "CUSTOM_PRODUCT_QUERY": "הדפסה על חולצות",
+      "APP_WEB_BASE": "https://elronprint-app.vercel.app"
     }
   }
 }
