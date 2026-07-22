@@ -1,4 +1,5 @@
 import Slider from '@react-native-community/slider';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
@@ -619,6 +620,7 @@ function DraggableImage({
 }
 
 let nextId = 1;
+const DRAFT_KEY = 'epd-studio-draft-v1';
 
 function newLayer(): Layer {
   return {
@@ -912,6 +914,50 @@ export default function Studio() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const selected = layers.find((l) => l.id === selectedId) ?? null;
 
+  // שמירה אוטומטית מקומית — טוענים טיוטה שמורה בכניסה לסטודיו (למקרה שיצאו בטעות), ושומרים
+  // אותה מחדש בכל שינוי, כדי שהעיצוב לא ילך לאיבוד. נשמר רק על המכשיר, לא בענן.
+  const draftLoaded = useRef(false);
+  useEffect(() => {
+    AsyncStorage.getItem(DRAFT_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const d = JSON.parse(raw);
+        if (d.shirtHex) {
+          const found = SHIRT_COLORS.find((c) => c.hex === d.shirtHex);
+          setShirt(found ?? { name: 'מותאם', hex: d.shirtHex });
+        }
+        if (d.size) setSize(d.size);
+        if (Array.isArray(d.layers) && d.layers.length) {
+          setLayers(d.layers);
+          const maxId = Math.max(0, ...d.layers.map((l: Layer) => l.id));
+          nextId = Math.max(nextId, maxId + 1);
+        }
+        if (d.localImg) setLocalImg(d.localImg);
+        if (d.cloudUrl) setCloudUrl(d.cloudUrl);
+        if (d.img) setImg({ ...DEFAULT_IMG, ...d.img });
+      })
+      .catch(() => {})
+      .finally(() => {
+        draftLoaded.current = true;
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!draftLoaded.current) return;
+    const t = setTimeout(() => {
+      const hasContent = layers.some((l) => l.text.trim()) || !!localImg;
+      if (!hasContent) {
+        AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
+        return;
+      }
+      AsyncStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({ shirtHex: shirt.hex, size, layers, localImg, cloudUrl, img }),
+      ).catch(() => {});
+    }, 600);
+    return () => clearTimeout(t);
+  }, [shirt, size, layers, localImg, cloudUrl, img]);
+
   // ביטול / חזרה
   type Snap = { layers: Layer[]; localImg: string | null; cloudUrl: string | null; img: ImgTransform };
   const past = useRef<Snap[]>([]);
@@ -1010,6 +1056,18 @@ export default function Studio() {
     const copy: Layer = { ...selected, id: nextId++, x: selected.x + 14, y: selected.y + 14 };
     setLayers((ls) => [...ls, copy]);
     setSelectedId(copy.id);
+  }
+
+  // העתק סגנון (format painter) — מעתיק את מאפייני העיצוב של שכבת הטקסט (לא את התוכן) כדי להדביק על שכבה אחרת
+  function copyStyle() {
+    if (!selected) return;
+    const { text, x, y, id, locked, ...style } = selected;
+    setCopiedStyle(style);
+  }
+
+  function pasteStyle() {
+    if (!copiedStyle) return;
+    updateSelected(copiedStyle);
   }
 
   function updateImg(patch: Partial<ImgTransform>, withSnapshot = true) {
@@ -1119,6 +1177,7 @@ export default function Studio() {
   const [shirtSat, setShirtSat] = useState(0);
   const [shirtLight, setShirtLight] = useState(50);
   const [openPanel, setOpenPanel] = useState<null | 'font' | 'color' | 'highlight' | 'more' | 'align'>(null);
+  const [copiedStyle, setCopiedStyle] = useState<Partial<Layer> | null>(null);
   const [imgPanel, setImgPanel] = useState<null | 'crop' | 'border'>(null);
   const BORDER_STYLES: { key: BorderStyle; label: string }[] = [
     { key: 'none', label: '⊘' },
@@ -1334,6 +1393,7 @@ export default function Studio() {
         quantity: 1,
         attributes,
       });
+      AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
       router.push('/cart');
     } catch (e) {
       Alert.alert('שגיאה', e instanceof Error ? e.message : 'לא הצלחנו להוסיף לעגלה, נסו שוב');
@@ -2065,6 +2125,16 @@ export default function Studio() {
           {selected && (
             <Pressable style={st.deleteBtn} onPress={duplicateSelected}>
               <Text style={st.deleteText}>⧉ שכפול</Text>
+            </Pressable>
+          )}
+          {selected && (
+            <Pressable style={st.deleteBtn} onPress={copyStyle}>
+              <Text style={st.deleteText}>🖌 העתק סגנון</Text>
+            </Pressable>
+          )}
+          {selected && copiedStyle && (
+            <Pressable style={st.deleteBtn} onPress={pasteStyle}>
+              <Text style={st.deleteText}>🖌 הדבק סגנון</Text>
             </Pressable>
           )}
           <Pressable style={st.graphicsBtn} onPress={() => setGraphicsOpen(true)}>
