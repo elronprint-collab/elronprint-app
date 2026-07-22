@@ -497,6 +497,7 @@ export default function Studio() {
   const [hue, setHue] = useState(120);
   const [sat, setSat] = useState(100);
   const [light, setLight] = useState(50);
+  const [openPanel, setOpenPanel] = useState<null | 'font' | 'color' | 'highlight'>(null);
   const [zoomOpen, setZoomOpen] = useState(false);
 
   useEffect(() => {
@@ -691,6 +692,238 @@ export default function Studio() {
           </View>
         </View>
 
+        {/* סרגל כלים קטן — כמו בקנבה, מופיע רק כשטקסט נבחר */}
+        {selected && (
+          <View style={st.toolbarWrap}>
+            <TextInput
+              style={[st.compactInput, { fontFamily: selected.font.family }]}
+              value={selected.text}
+              onFocus={() => {
+                if (!textEditSnapped.current) {
+                  snapshot();
+                  textEditSnapped.current = true;
+                }
+              }}
+              onBlur={() => {
+                textEditSnapped.current = false;
+              }}
+              onChangeText={(t) => updateSelected({ text: t }, false)}
+              placeholder="כתבו כאן…"
+              placeholderTextColor={C.textDim}
+              maxLength={60}
+            />
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.toolbarRow}>
+              <Pressable
+                style={[st.toolFontBtn, openPanel === 'font' && st.btnActive]}
+                onPress={() => setOpenPanel((p) => (p === 'font' ? null : 'font'))}
+              >
+                <Text style={[st.toolFontText, { fontFamily: selected.font.family }]} numberOfLines={1}>
+                  {selected.font.name}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={[st.toolColorBtn, { backgroundColor: selected.color }]}
+                onPress={() => setOpenPanel((p) => (p === 'color' ? null : 'color'))}
+              />
+
+              <View style={st.stepperGroup}>
+                <Pressable
+                  style={st.stepBtn}
+                  onPress={() => updateSelected({ size: clamp(selected.size - 1, MIN_TEXT_SIZE, MAX_TEXT_SIZE) })}
+                >
+                  <Text style={st.stepBtnText}>−</Text>
+                </Pressable>
+                <Text style={st.stepValue}>{selected.size}</Text>
+                <Pressable
+                  style={st.stepBtn}
+                  onPress={() => updateSelected({ size: clamp(selected.size + 1, MIN_TEXT_SIZE, MAX_TEXT_SIZE) })}
+                >
+                  <Text style={st.stepBtnText}>+</Text>
+                </Pressable>
+              </View>
+
+              <Pressable
+                style={[st.toolIconBtn, selected.bold && st.btnActive]}
+                onPress={() => updateSelected({ bold: !selected.bold })}
+              >
+                <Text style={[st.boldText, selected.bold && st.textActive]}>B</Text>
+              </Pressable>
+
+              {ALIGNS.map((a) => (
+                <Pressable
+                  key={a.key}
+                  style={[st.toolIconBtn, selected.align === a.key && st.btnActive]}
+                  onPress={() => updateSelected({ align: a.key })}
+                >
+                  <Text style={[st.toolIconGlyph, selected.align === a.key && st.textActive]}>
+                    {a.key === 'right' ? '⇥' : a.key === 'center' ? '↔' : '⇤'}
+                  </Text>
+                </Pressable>
+              ))}
+
+              <Pressable
+                style={[st.toolIconBtn, openPanel === 'highlight' && st.btnActive]}
+                onPress={() => setOpenPanel((p) => (p === 'highlight' ? null : 'highlight'))}
+              >
+                <Text style={st.toolIconGlyph}>🖍</Text>
+              </Pressable>
+
+              <View style={st.stepperGroup}>
+                <Pressable style={st.stepBtn} onPress={() => updateSelected({ spacing: clamp(selected.spacing - 1, 0, 12) })}>
+                  <Text style={st.stepBtnText}>−</Text>
+                </Pressable>
+                <Text style={st.stepValue}>{selected.spacing}</Text>
+                <Pressable style={st.stepBtn} onPress={() => updateSelected({ spacing: clamp(selected.spacing + 1, 0, 12) })}>
+                  <Text style={st.stepBtnText}>+</Text>
+                </Pressable>
+              </View>
+
+              <View style={st.stepperGroup}>
+                <Pressable
+                  style={st.stepBtn}
+                  onPress={() => updateSelected({ rotation: clamp(selected.rotation - 5, -45, 45) })}
+                >
+                  <Text style={st.stepBtnText}>−</Text>
+                </Pressable>
+                <Text style={st.stepValue}>{selected.rotation}°</Text>
+                <Pressable
+                  style={st.stepBtn}
+                  onPress={() => updateSelected({ rotation: clamp(selected.rotation + 5, -45, 45) })}
+                >
+                  <Text style={st.stepBtnText}>+</Text>
+                </Pressable>
+              </View>
+
+              <Pressable
+                style={[st.toolIconBtn, selected.outline && st.btnActive]}
+                onPress={() => updateSelected({ outline: !selected.outline })}
+              >
+                <Text style={[st.toolIconGlyph, selected.outline && st.textActive]}>◎</Text>
+              </Pressable>
+            </ScrollView>
+
+            {openPanel === 'font' && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.fontRow}>
+                {FONTS.map((f) => (
+                  <Pressable
+                    key={f.family}
+                    onPress={() => updateSelected({ font: f })}
+                    style={[st.fontBtn, selected.font.family === f.family && st.btnActive]}
+                  >
+                    <Text
+                      style={[
+                        st.fontText,
+                        { fontFamily: f.family },
+                        selected.font.family === f.family && st.textActive,
+                      ]}
+                    >
+                      {f.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+
+            {openPanel === 'color' && (
+              <View>
+                <View style={st.row}>
+                  {TEXT_COLORS.map((c) => (
+                    <Pressable
+                      key={c}
+                      onPress={() => updateSelected({ color: c })}
+                      style={[st.swatchSm, { backgroundColor: c }, selected.color === c && st.swatchActive]}
+                    />
+                  ))}
+                </View>
+                <Pressable
+                  style={[st.outlineBtn, customOpen && st.btnActive]}
+                  onPress={() => setCustomOpen((v) => !v)}
+                >
+                  <Text style={[st.sizeText, customOpen && st.textActive]}>🎨 כל צבע — בורר חופשי</Text>
+                </Pressable>
+                {customOpen && (
+                  <View style={st.customBox}>
+                    <View style={st.customHeader}>
+                      <View style={[st.customSwatch, { backgroundColor: hslToHex(hue, sat, light) }]} />
+                      <Pressable
+                        style={st.applyBtn}
+                        onPress={() => updateSelected({ color: hslToHex(hue, sat, light) })}
+                      >
+                        <Text style={st.applyText}>החלת הצבע</Text>
+                      </Pressable>
+                    </View>
+                    <View style={st.sliderRow}>
+                      <Slider
+                        style={st.slider}
+                        inverted={SLIDER_INVERTED}
+                        minimumValue={0}
+                        maximumValue={360}
+                        step={1}
+                        value={hue}
+                        onValueChange={(v) => setHue(Math.round(v))}
+                        minimumTrackTintColor={hslToHex(hue, 100, 50)}
+                        maximumTrackTintColor={C.border}
+                        thumbTintColor={hslToHex(hue, 100, 50)}
+                      />
+                      <Text style={st.sliderLabel}>גוון</Text>
+                    </View>
+                    <View style={st.sliderRow}>
+                      <Slider
+                        style={st.slider}
+                        inverted={SLIDER_INVERTED}
+                        minimumValue={0}
+                        maximumValue={100}
+                        step={1}
+                        value={sat}
+                        onValueChange={(v) => setSat(Math.round(v))}
+                        minimumTrackTintColor={C.accent}
+                        maximumTrackTintColor={C.border}
+                        thumbTintColor={C.accent}
+                      />
+                      <Text style={st.sliderLabel}>עוצמה</Text>
+                    </View>
+                    <View style={st.sliderRow}>
+                      <Slider
+                        style={st.slider}
+                        inverted={SLIDER_INVERTED}
+                        minimumValue={5}
+                        maximumValue={95}
+                        step={1}
+                        value={light}
+                        onValueChange={(v) => setLight(Math.round(v))}
+                        minimumTrackTintColor={C.accent}
+                        maximumTrackTintColor={C.border}
+                        thumbTintColor={C.accent}
+                      />
+                      <Text style={st.sliderLabel}>בהירות</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {openPanel === 'highlight' && (
+              <View style={st.row}>
+                {HIGHLIGHTS.map((h) => (
+                  <Pressable
+                    key={h ?? 'none'}
+                    onPress={() => updateSelected({ highlight: h })}
+                    style={[
+                      st.swatchSm,
+                      h ? { backgroundColor: h } : st.noneSwatch,
+                      selected.highlight === h && st.swatchActive,
+                    ]}
+                  >
+                    {!h && <Text style={st.noneText}>✕</Text>}
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
         {/* תצוגה מקדימה */}
         <View style={[st.shirtPreview, { backgroundColor: shirt.hex }]}>
           <View style={[st.printArea, { borderColor: lightShirt ? '#00000022' : '#ffffff22' }]}>
@@ -755,220 +988,6 @@ export default function Studio() {
           ))}
         </ScrollView>
 
-        {selected && (
-          <View style={st.editor}>
-            <TextInput
-              style={[st.input, { fontFamily: selected.font.family }]}
-              value={selected.text}
-              onFocus={() => {
-                if (!textEditSnapped.current) {
-                  snapshot();
-                  textEditSnapped.current = true;
-                }
-              }}
-              onBlur={() => {
-                textEditSnapped.current = false;
-              }}
-              onChangeText={(t) => updateSelected({ text: t }, false)}
-              placeholder="כתבו כאן…"
-              placeholderTextColor={C.textDim}
-              maxLength={60}
-              multiline
-            />
-
-            {/* מודגש + יישור */}
-            <View style={st.toolRow}>
-              <View style={st.alignGroup}>
-                {ALIGNS.map((a) => (
-                  <Pressable
-                    key={a.key}
-                    onPress={() => updateSelected({ align: a.key })}
-                    style={[st.alignBtn, selected.align === a.key && st.btnActive]}
-                  >
-                    <Text style={[st.sizeText, selected.align === a.key && st.textActive]}>{a.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Pressable
-                onPress={() => updateSelected({ bold: !selected.bold })}
-                style={[st.boldBtn, selected.bold && st.btnActive]}
-              >
-                <Text style={[st.boldText, selected.bold && st.textActive]}>B</Text>
-              </Pressable>
-            </View>
-
-            <Text style={st.subLabel}>פונט — 18 פונטים, גללו הצידה ←</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.fontRow}>
-              {FONTS.map((f) => (
-                <Pressable
-                  key={f.family}
-                  onPress={() => updateSelected({ font: f })}
-                  style={[st.fontBtn, selected.font.family === f.family && st.btnActive]}
-                >
-                  <Text
-                    style={[st.fontText, { fontFamily: f.family }, selected.font.family === f.family && st.textActive]}
-                  >
-                    {f.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-
-            <Text style={st.subLabel}>צבע — ולכל גוון אחר פתחו את הבורר 🎨</Text>
-            <View style={st.row}>
-              {TEXT_COLORS.map((c) => (
-                <Pressable
-                  key={c}
-                  onPress={() => updateSelected({ color: c })}
-                  style={[st.swatchSm, { backgroundColor: c }, selected.color === c && st.swatchActive]}
-                />
-              ))}
-            </View>
-
-            <Pressable
-              style={[st.outlineBtn, customOpen && st.btnActive]}
-              onPress={() => setCustomOpen((v) => !v)}
-            >
-              <Text style={[st.sizeText, customOpen && st.textActive]}>🎨 כל צבע — בורר חופשי</Text>
-            </Pressable>
-            {customOpen && (
-              <View style={st.customBox}>
-                <View style={st.customHeader}>
-                  <View style={[st.customSwatch, { backgroundColor: hslToHex(hue, sat, light) }]} />
-                  <Pressable
-                    style={st.applyBtn}
-                    onPress={() => updateSelected({ color: hslToHex(hue, sat, light) })}
-                  >
-                    <Text style={st.applyText}>החלת הצבע</Text>
-                  </Pressable>
-                </View>
-                <View style={st.sliderRow}>
-                  <Slider
-                    style={st.slider}
-                    inverted={SLIDER_INVERTED}
-                    minimumValue={0}
-                    maximumValue={360}
-                    step={1}
-                    value={hue}
-                    onValueChange={(v) => setHue(Math.round(v))}
-                    minimumTrackTintColor={hslToHex(hue, 100, 50)}
-                    maximumTrackTintColor={C.border}
-                    thumbTintColor={hslToHex(hue, 100, 50)}
-                  />
-                  <Text style={st.sliderLabel}>גוון</Text>
-                </View>
-                <View style={st.sliderRow}>
-                  <Slider
-                    style={st.slider}
-                    inverted={SLIDER_INVERTED}
-                    minimumValue={0}
-                    maximumValue={100}
-                    step={1}
-                    value={sat}
-                    onValueChange={(v) => setSat(Math.round(v))}
-                    minimumTrackTintColor={C.accent}
-                    maximumTrackTintColor={C.border}
-                    thumbTintColor={C.accent}
-                  />
-                  <Text style={st.sliderLabel}>עוצמה</Text>
-                </View>
-                <View style={st.sliderRow}>
-                  <Slider
-                    style={st.slider}
-                    inverted={SLIDER_INVERTED}
-                    minimumValue={5}
-                    maximumValue={95}
-                    step={1}
-                    value={light}
-                    onValueChange={(v) => setLight(Math.round(v))}
-                    minimumTrackTintColor={C.accent}
-                    maximumTrackTintColor={C.border}
-                    thumbTintColor={C.accent}
-                  />
-                  <Text style={st.sliderLabel}>בהירות</Text>
-                </View>
-              </View>
-            )}
-
-            <Text style={st.subLabel}>רקע לטקסט (מרקר)</Text>
-            <View style={st.row}>
-              {HIGHLIGHTS.map((h) => (
-                <Pressable
-                  key={h ?? 'none'}
-                  onPress={() => updateSelected({ highlight: h })}
-                  style={[
-                    st.swatchSm,
-                    h ? { backgroundColor: h } : st.noneSwatch,
-                    selected.highlight === h && st.swatchActive,
-                  ]}
-                >
-                  {!h && <Text style={st.noneText}>✕</Text>}
-                </Pressable>
-              ))}
-            </View>
-
-            <View style={st.sliderRow}>
-              <Text style={st.sliderValue}>{selected.size}</Text>
-              <Slider
-                style={st.slider}
-                inverted={SLIDER_INVERTED}
-                minimumValue={12}
-                maximumValue={64}
-                step={1}
-                value={selected.size}
-                onSlidingStart={snapshot}
-                onValueChange={(v) => updateSelected({ size: Math.round(v) }, false)}
-                minimumTrackTintColor={C.accent}
-                maximumTrackTintColor={C.border}
-                thumbTintColor={C.accent}
-              />
-              <Text style={st.sliderLabel}>גודל</Text>
-            </View>
-
-            <View style={st.sliderRow}>
-              <Text style={st.sliderValue}>{selected.rotation}°</Text>
-              <Slider
-                style={st.slider}
-                inverted={SLIDER_INVERTED}
-                minimumValue={-45}
-                maximumValue={45}
-                step={1}
-                value={selected.rotation}
-                onSlidingStart={snapshot}
-                onValueChange={(v) => updateSelected({ rotation: Math.round(v) }, false)}
-                minimumTrackTintColor={C.accent}
-                maximumTrackTintColor={C.border}
-                thumbTintColor={C.accent}
-              />
-              <Text style={st.sliderLabel}>סיבוב</Text>
-            </View>
-
-            <View style={st.sliderRow}>
-              <Text style={st.sliderValue}>{selected.spacing}</Text>
-              <Slider
-                style={st.slider}
-                inverted={SLIDER_INVERTED}
-                minimumValue={0}
-                maximumValue={12}
-                step={1}
-                value={selected.spacing}
-                onSlidingStart={snapshot}
-                onValueChange={(v) => updateSelected({ spacing: Math.round(v) }, false)}
-                minimumTrackTintColor={C.accent}
-                maximumTrackTintColor={C.border}
-                thumbTintColor={C.accent}
-              />
-              <Text style={st.sliderLabel}>ריווח</Text>
-            </View>
-
-            <Pressable
-              style={[st.outlineBtn, selected.outline && st.btnActive]}
-              onPress={() => updateSelected({ outline: !selected.outline })}
-            >
-              <Text style={[st.sizeText, selected.outline && st.textActive]}>קו מתאר לטקסט</Text>
-            </Pressable>
-          </View>
-        )}
 
         {cloudUrl && !uploading && (
           <>
@@ -1290,44 +1309,49 @@ const st = StyleSheet.create({
     paddingHorizontal: 16,
   },
   deleteText: { color: C.danger, fontSize: 14, fontWeight: '800' },
-  editor: {
-    marginTop: S.md,
+  toolbarWrap: {
+    marginTop: S.sm,
     backgroundColor: C.surface,
     borderRadius: R.md,
     borderWidth: 1,
     borderColor: C.border,
-    padding: S.md,
+    padding: S.sm,
   },
-  input: {
+  compactInput: {
     backgroundColor: C.bg,
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: R.md,
+    borderRadius: R.sm,
     color: C.text,
-    fontSize: 17,
-    padding: S.md,
-    minHeight: 52,
-    textAlign: 'right',
-  },
-  toolRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: S.sm,
-    marginTop: S.md,
-  },
-  alignGroup: { flexDirection: 'row', gap: S.xs },
-  alignBtn: {
-    paddingVertical: 9,
+    fontSize: 15,
+    paddingVertical: 8,
     paddingHorizontal: 12,
+    textAlign: 'right',
+    marginBottom: S.sm,
+  },
+  toolbarRow: { flexDirection: 'row', gap: S.xs, alignItems: 'center' },
+  toolFontBtn: {
+    minWidth: 64,
+    maxWidth: 90,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderRadius: R.sm,
     backgroundColor: C.bg,
     borderWidth: 1,
     borderColor: C.border,
+    alignItems: 'center',
   },
-  boldBtn: {
-    width: 42,
-    height: 38,
+  toolFontText: { color: C.text, fontSize: 13, fontWeight: '700' },
+  toolColorBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: R.full,
+    borderWidth: 2,
+    borderColor: C.border,
+  },
+  toolIconBtn: {
+    width: 34,
+    height: 34,
     borderRadius: R.sm,
     backgroundColor: C.bg,
     borderWidth: 1,
@@ -1335,6 +1359,19 @@ const st = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  toolIconGlyph: { color: C.textDim, fontSize: 16, fontWeight: '700' },
+  stepperGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.bg,
+    borderRadius: R.sm,
+    borderWidth: 1,
+    borderColor: C.border,
+    overflow: 'hidden',
+  },
+  stepBtn: { paddingVertical: 8, paddingHorizontal: 10 },
+  stepBtnText: { color: C.accent, fontSize: 16, fontWeight: '800' },
+  stepValue: { color: C.text, fontSize: 13, fontWeight: '700', minWidth: 30, textAlign: 'center' },
   boldText: { color: C.textDim, fontSize: 17, fontWeight: '900' },
   label: {
     color: C.text,
