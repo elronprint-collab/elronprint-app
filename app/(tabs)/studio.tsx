@@ -943,6 +943,15 @@ export default function Studio() {
         }
         if (d.localImg) setLocalImg(d.localImg);
         if (d.cloudUrl) setCloudUrl(d.cloudUrl);
+        else if (d.localImg) {
+          // התמונה נשמרה מקומית אבל ההעלאה לענן לא הושלמה (למשל אם היישום נסגר באמצע) —
+          // מנסים להעלות שוב ברקע כדי שאפשר יהיה להמשיך להזמנה בלי לתקוע את המשתמש
+          setUploading(true);
+          uploadImage(d.localImg)
+            .then((url) => setCloudUrl(url))
+            .catch(() => {})
+            .finally(() => setUploading(false));
+        }
         if (d.img) setImg({ ...DEFAULT_IMG, ...d.img });
       })
       .catch(() => {})
@@ -1177,14 +1186,11 @@ export default function Studio() {
   // השראה מהחנות + זום
   const [inspiration, setInspiration] = useState<Product[]>([]);
   const [scrollLocked, setScrollLocked] = useState(false);
-  const [customOpen, setCustomOpen] = useState(false);
-  const [hue, setHue] = useState(120);
-  const [sat, setSat] = useState(100);
-  const [light, setLight] = useState(50);
   const [openPanel, setOpenPanel] = useState<null | 'font' | 'color' | 'highlight' | 'more' | 'align'>(null);
   const [copiedStyle, setCopiedStyle] = useState<Partial<Layer> | null>(null);
   const fontScrollRef = useRef<ScrollView>(null);
   const fontScrollX = useRef(0);
+  const [shirtPaletteOpen, setShirtPaletteOpen] = useState(false);
   const [imgPanel, setImgPanel] = useState<null | 'crop' | 'border'>(null);
   const BORDER_STYLES: { key: BorderStyle; label: string }[] = [
     { key: 'none', label: '⊘' },
@@ -1278,7 +1284,21 @@ export default function Studio() {
   }
 
   async function continueToOrder() {
-    if (!hasDesign || ordering || uploading) return;
+    if (ordering || uploading) return;
+    if (!hasDesign && localImg) {
+      setUploading(true);
+      try {
+        const url = await uploadImage(localImg);
+        setCloudUrl(url);
+      } catch {
+        Alert.alert('שגיאה', 'העלאת התמונה נכשלה. בדקו חיבור לאינטרנט ונסו שוב.');
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    } else if (!hasDesign) {
+      return;
+    }
     setOrdering(true);
     try {
       const product = await fetchCustomProduct();
@@ -1424,13 +1444,6 @@ export default function Studio() {
           <Text style={st.title}>סטודיו עיצוב</Text>
           <View style={st.historyRow}>
             <Pressable
-              onPress={() => (router.canGoBack() ? router.back() : router.push('/'))}
-              style={st.arrowBtn}
-              hitSlop={4}
-            >
-              <Text style={st.navArrowText}>→</Text>
-            </Pressable>
-            <Pressable
               onPress={undo}
               disabled={past.current.length === 0}
               style={[st.arrowBtn, past.current.length === 0 && st.histBtnOff]}
@@ -1496,6 +1509,15 @@ export default function Studio() {
                 thumbTintColor={C.accent}
               />
               <Text style={st.sliderLabel}>שקיפות</Text>
+            </View>
+            <View style={st.stepperGroup}>
+              <Pressable style={st.stepBtn} onPress={() => updateImg({ opacity: clamp(img.opacity - 5, 10, 100) })}>
+                <Text style={st.stepBtnText}>−</Text>
+              </Pressable>
+              <Text style={st.stepValue}>{img.opacity}%</Text>
+              <Pressable style={st.stepBtn} onPress={() => updateImg({ opacity: clamp(img.opacity + 5, 10, 100) })}>
+                <Text style={st.stepBtnText}>+</Text>
+              </Pressable>
             </View>
 
             <Text style={st.subLabel}>יישור התמונה</Text>
@@ -1803,6 +1825,13 @@ export default function Studio() {
               >
                 <Text style={st.toolIconGlyph}>⋯</Text>
               </Pressable>
+
+              <Pressable style={st.toolIconBtn} onPress={sendToBack}>
+                <Text style={st.toolIconGlyph}>⬇</Text>
+              </Pressable>
+              <Pressable style={st.toolIconBtn} onPress={bringToFront}>
+                <Text style={st.toolIconGlyph}>⬆</Text>
+              </Pressable>
             </ScrollView>
 
             {openPanel === 'align' && (
@@ -1879,6 +1908,21 @@ export default function Studio() {
                   />
                   <Text style={st.sliderLabel}>שקיפות</Text>
                 </View>
+                <View style={st.stepperGroup}>
+                  <Pressable
+                    style={st.stepBtn}
+                    onPress={() => updateSelected({ opacity: clamp(selected.opacity - 5, 10, 100) })}
+                  >
+                    <Text style={st.stepBtnText}>−</Text>
+                  </Pressable>
+                  <Text style={st.stepValue}>{selected.opacity}%</Text>
+                  <Pressable
+                    style={st.stepBtn}
+                    onPress={() => updateSelected({ opacity: clamp(selected.opacity + 5, 10, 100) })}
+                  >
+                    <Text style={st.stepBtnText}>+</Text>
+                  </Pressable>
+                </View>
 
                 <View style={st.stepperGroup}>
                   <Pressable
@@ -1895,15 +1939,6 @@ export default function Studio() {
                     <Text style={st.stepBtnText}>+</Text>
                   </Pressable>
                   <Text style={st.stepGroupLabel}>מרווח שורות</Text>
-                </View>
-
-                <View style={st.row}>
-                  <Pressable style={st.zOrderBtn} onPress={sendToBack}>
-                    <Text style={st.zOrderText}>⬇ שלח אחורה</Text>
-                  </Pressable>
-                  <Pressable style={st.zOrderBtn} onPress={bringToFront}>
-                    <Text style={st.zOrderText}>⬆ הבא לפנים</Text>
-                  </Pressable>
                 </View>
               </View>
             )}
@@ -1964,70 +1999,6 @@ export default function Studio() {
                     </View>
                   ))}
                 </ScrollView>
-                <Pressable
-                  style={[st.outlineBtn, customOpen && st.btnActive]}
-                  onPress={() => setCustomOpen((v) => !v)}
-                >
-                  <Text style={[st.sizeText, customOpen && st.textActive]}>🎨 כל צבע — בורר חופשי</Text>
-                </Pressable>
-                {customOpen && (
-                  <View style={st.customBox}>
-                    <View style={st.customHeader}>
-                      <View style={[st.customSwatch, { backgroundColor: hslToHex(hue, sat, light) }]} />
-                      <Pressable
-                        style={st.applyBtn}
-                        onPress={() => updateSelected({ color: hslToHex(hue, sat, light) })}
-                      >
-                        <Text style={st.applyText}>החלת הצבע</Text>
-                      </Pressable>
-                    </View>
-                    <View style={st.sliderRow}>
-                      <Slider
-                        style={st.slider}
-                        inverted={SLIDER_INVERTED}
-                        minimumValue={0}
-                        maximumValue={360}
-                        step={1}
-                        value={hue}
-                        onValueChange={(v) => setHue(Math.round(v))}
-                        minimumTrackTintColor={hslToHex(hue, 100, 50)}
-                        maximumTrackTintColor={C.border}
-                        thumbTintColor={hslToHex(hue, 100, 50)}
-                      />
-                      <Text style={st.sliderLabel}>גוון</Text>
-                    </View>
-                    <View style={st.sliderRow}>
-                      <Slider
-                        style={st.slider}
-                        inverted={SLIDER_INVERTED}
-                        minimumValue={0}
-                        maximumValue={100}
-                        step={1}
-                        value={sat}
-                        onValueChange={(v) => setSat(Math.round(v))}
-                        minimumTrackTintColor={C.accent}
-                        maximumTrackTintColor={C.border}
-                        thumbTintColor={C.accent}
-                      />
-                      <Text style={st.sliderLabel}>עוצמה</Text>
-                    </View>
-                    <View style={st.sliderRow}>
-                      <Slider
-                        style={st.slider}
-                        inverted={SLIDER_INVERTED}
-                        minimumValue={5}
-                        maximumValue={95}
-                        step={1}
-                        value={light}
-                        onValueChange={(v) => setLight(Math.round(v))}
-                        minimumTrackTintColor={C.accent}
-                        maximumTrackTintColor={C.border}
-                        thumbTintColor={C.accent}
-                      />
-                      <Text style={st.sliderLabel}>בהירות</Text>
-                    </View>
-                  </View>
-                )}
               </View>
             )}
 
@@ -2170,6 +2141,9 @@ export default function Studio() {
           <Pressable style={st.graphicsBtn} onPress={() => setGraphicsOpen(true)}>
             <Text style={st.graphicsBtnText}>🖼 גרפיקות</Text>
           </Pressable>
+          <Pressable style={st.graphicsBtn} onPress={pickImage} disabled={uploading}>
+            <Text style={st.graphicsBtnText}>{localImg ? '📤 החלפת תמונה' : '📤 העלאת עיצוב'}</Text>
+          </Pressable>
           <Pressable style={st.addTextBtn} onPress={addLayer}>
             <Text style={st.addTextBtnText}>+ הוספת טקסט</Text>
           </Pressable>
@@ -2218,19 +2192,29 @@ export default function Studio() {
         </View>
         <Text style={st.hint}>{shirt.name}</Text>
 
-        <ScrollView style={st.paletteScroll} nestedScrollEnabled showsVerticalScrollIndicator>
-          {PALETTE_GRID.map((row, ri) => (
-            <View style={st.row} key={ri}>
-              {row.map((c, ci) => (
-                <Pressable
-                  key={c + ci}
-                  onPress={() => setShirt({ name: 'מותאם אישית', hex: c })}
-                  style={[st.swatchSm, { backgroundColor: c }, shirt.hex === c && st.swatchActive]}
-                />
-              ))}
-            </View>
-          ))}
-        </ScrollView>
+        <Pressable
+          style={[st.outlineBtn, shirtPaletteOpen && st.btnActive]}
+          onPress={() => setShirtPaletteOpen((v) => !v)}
+        >
+          <Text style={[st.sizeText, shirtPaletteOpen && st.textActive]}>
+            {shirtPaletteOpen ? '✕ סגירת עוד צבעים' : '🎨 עוד צבעים'}
+          </Text>
+        </Pressable>
+        {shirtPaletteOpen && (
+          <ScrollView style={st.paletteScroll} nestedScrollEnabled showsVerticalScrollIndicator>
+            {PALETTE_GRID.map((row, ri) => (
+              <View style={st.row} key={ri}>
+                {row.map((c, ci) => (
+                  <Pressable
+                    key={c + ci}
+                    onPress={() => setShirt({ name: 'מותאם אישית', hex: c })}
+                    style={[st.swatchSm, { backgroundColor: c }, shirt.hex === c && st.swatchActive]}
+                  />
+                ))}
+              </View>
+            ))}
+          </ScrollView>
+        )}
 
         <Text style={st.label}>מידה</Text>
         <View style={st.row}>
@@ -2263,8 +2247,8 @@ export default function Studio() {
         </Pressable>
 
         <Pressable
-          style={[st.nextBtn, (!hasDesign || uploading || ordering) && st.nextBtnDisabled]}
-          disabled={!hasDesign || uploading || ordering}
+          style={[st.nextBtn, (!hasDesign && !localImg || uploading || ordering) && st.nextBtnDisabled]}
+          disabled={(!hasDesign && !localImg) || uploading || ordering}
           onPress={continueToOrder}
         >
           {ordering ? <ActivityIndicator color={C.onAccent} /> : <Text style={st.nextBtnText}>המשך להזמנה ←</Text>}
@@ -2701,7 +2685,7 @@ const st = StyleSheet.create({
   adviceLine: { color: '#ffd166', fontSize: 12, textAlign: 'right', marginTop: 3 },
   adviceLineOk: { color: C.accent, fontSize: 12, textAlign: 'right', marginTop: 3 },
   adviceFooter: { color: C.textDim, fontSize: 10, textAlign: 'right', marginTop: 6 },
-  rowSpread: { flexDirection: 'row', justifyContent: 'flex-end', gap: S.sm, marginTop: S.md },
+  rowSpread: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: S.sm, marginTop: S.md },
   addTextBtn: { backgroundColor: C.accent, borderRadius: R.full, paddingVertical: 11, paddingHorizontal: 20 },
   addTextBtnText: { color: C.onAccent, fontSize: 15, fontWeight: '800' },
   graphicsBtn: {
