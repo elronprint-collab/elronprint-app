@@ -13,6 +13,9 @@ export type DesignLayer = {
   align: 'right' | 'center' | 'left';
   spacing: number;
   bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  strikethrough: boolean;
   highlight: string | null;
   outline: boolean;
   opacity: number;
@@ -31,6 +34,13 @@ export type CartImageTransform = {
   flipH: boolean;
   flipV: boolean;
   opacity: number;
+  borderStyle?: 'none' | 'solid' | 'dashed' | 'dotted';
+  borderColor?: string;
+  borderWidth?: number;
+  cornerRadius?: number;
+  cropScale?: number;
+  cropOffsetX?: number;
+  cropOffsetY?: number;
 };
 
 export type CartDesign = {
