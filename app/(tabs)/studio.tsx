@@ -1181,10 +1181,6 @@ export default function Studio() {
   const [hue, setHue] = useState(120);
   const [sat, setSat] = useState(100);
   const [light, setLight] = useState(50);
-  const [shirtCustomOpen, setShirtCustomOpen] = useState(false);
-  const [shirtHue, setShirtHue] = useState(0);
-  const [shirtSat, setShirtSat] = useState(0);
-  const [shirtLight, setShirtLight] = useState(50);
   const [openPanel, setOpenPanel] = useState<null | 'font' | 'color' | 'highlight' | 'more' | 'align'>(null);
   const [copiedStyle, setCopiedStyle] = useState<Partial<Layer> | null>(null);
   const [imgPanel, setImgPanel] = useState<null | 'crop' | 'border'>(null);
@@ -2214,71 +2210,6 @@ export default function Studio() {
             </View>
           ))}
         </ScrollView>
-
-        <Pressable
-          style={[st.outlineBtn, shirtCustomOpen && st.btnActive]}
-          onPress={() => setShirtCustomOpen((v) => !v)}
-        >
-          <Text style={[st.sizeText, shirtCustomOpen && st.textActive]}>🎨 כל צבע — בורר חופשי</Text>
-        </Pressable>
-        {shirtCustomOpen && (
-          <View style={st.customBox}>
-            <View style={st.customHeader}>
-              <View style={[st.customSwatch, { backgroundColor: hslToHex(shirtHue, shirtSat, shirtLight) }]} />
-              <Pressable
-                style={st.applyBtn}
-                onPress={() => setShirt({ name: 'מותאם אישית', hex: hslToHex(shirtHue, shirtSat, shirtLight) })}
-              >
-                <Text style={st.applyText}>החלת הצבע</Text>
-              </Pressable>
-            </View>
-            <View style={st.sliderRow}>
-              <Slider
-                style={st.slider}
-                inverted={SLIDER_INVERTED}
-                minimumValue={0}
-                maximumValue={360}
-                step={1}
-                value={shirtHue}
-                onValueChange={(v) => setShirtHue(Math.round(v))}
-                minimumTrackTintColor={hslToHex(shirtHue, 100, 50)}
-                maximumTrackTintColor={C.border}
-                thumbTintColor={hslToHex(shirtHue, 100, 50)}
-              />
-              <Text style={st.sliderLabel}>גוון</Text>
-            </View>
-            <View style={st.sliderRow}>
-              <Slider
-                style={st.slider}
-                inverted={SLIDER_INVERTED}
-                minimumValue={0}
-                maximumValue={100}
-                step={1}
-                value={shirtSat}
-                onValueChange={(v) => setShirtSat(Math.round(v))}
-                minimumTrackTintColor={C.accent}
-                maximumTrackTintColor={C.border}
-                thumbTintColor={C.accent}
-              />
-              <Text style={st.sliderLabel}>עוצמה</Text>
-            </View>
-            <View style={st.sliderRow}>
-              <Slider
-                style={st.slider}
-                inverted={SLIDER_INVERTED}
-                minimumValue={5}
-                maximumValue={95}
-                step={1}
-                value={shirtLight}
-                onValueChange={(v) => setShirtLight(Math.round(v))}
-                minimumTrackTintColor={C.accent}
-                maximumTrackTintColor={C.border}
-                thumbTintColor={C.accent}
-              />
-              <Text style={st.sliderLabel}>בהירות</Text>
-            </View>
-          </View>
-        )}
 
         <Text style={st.label}>מידה</Text>
         <View style={st.row}>
