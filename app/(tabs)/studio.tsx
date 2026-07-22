@@ -74,6 +74,147 @@ const HIGHLIGHTS: (string | null)[] = [null, '#000000', '#ffffff', '#00fc25', '#
 
 const SYMBOLS = ['❤️', '⚡', '👑', '⭐', '🔥', '😎', '🎉', '🦄', '⚽', '🎸', '💪', '🌈'];
 
+type Graphic = { char: string; keywords: string[] };
+type GraphicCategory = { name: string; items: Graphic[] };
+
+const GRAPHIC_CATEGORIES: GraphicCategory[] = [
+  {
+    name: 'פרחים וטבע',
+    items: [
+      { char: '🌸', keywords: ['פרח', 'ורוד'] },
+      { char: '🌺', keywords: ['פרח', 'היביסקוס'] },
+      { char: '🌻', keywords: ['פרח', 'חמנייה'] },
+      { char: '🌼', keywords: ['פרח', 'חינניות'] },
+      { char: '🌷', keywords: ['פרח', 'צבעוני'] },
+      { char: '🌹', keywords: ['פרח', 'ורד'] },
+      { char: '🍀', keywords: ['תלתן', 'מזל'] },
+      { char: '🌳', keywords: ['עץ'] },
+      { char: '🌲', keywords: ['עץ', 'אורן'] },
+      { char: '🌴', keywords: ['דקל'] },
+      { char: '🍁', keywords: ['עלה', 'סתיו'] },
+      { char: '🌵', keywords: ['קקטוס'] },
+      { char: '🌊', keywords: ['ים', 'גל'] },
+      { char: '☀️', keywords: ['שמש'] },
+    ],
+  },
+  {
+    name: 'בעלי חיים',
+    items: [
+      { char: '🐶', keywords: ['כלב'] },
+      { char: '🐱', keywords: ['חתול'] },
+      { char: '🐰', keywords: ['ארנב'] },
+      { char: '🐻', keywords: ['דוב'] },
+      { char: '🦁', keywords: ['אריה'] },
+      { char: '🐯', keywords: ['נמר'] },
+      { char: '🐨', keywords: ['קואלה'] },
+      { char: '🐼', keywords: ['פנדה'] },
+      { char: '🦊', keywords: ['שועל'] },
+      { char: '🐸', keywords: ['צפרדע'] },
+      { char: '🦄', keywords: ['חד קרן'] },
+      { char: '🐝', keywords: ['דבורה'] },
+      { char: '🦋', keywords: ['פרפר'] },
+      { char: '🐬', keywords: ['דולפין'] },
+      { char: '🦉', keywords: ['ינשוף'] },
+      { char: '🐢', keywords: ['צב'] },
+    ],
+  },
+  {
+    name: 'אוכל ומשקאות',
+    items: [
+      { char: '🍕', keywords: ['פיצה'] },
+      { char: '🍔', keywords: ['המבורגר'] },
+      { char: '🍟', keywords: ['צ׳יפס'] },
+      { char: '🌮', keywords: ['טאקו'] },
+      { char: '🍩', keywords: ['דונאט', 'סופגנייה'] },
+      { char: '🍪', keywords: ['עוגייה'] },
+      { char: '🎂', keywords: ['עוגה', 'יום הולדת'] },
+      { char: '🍦', keywords: ['גלידה'] },
+      { char: '🍰', keywords: ['עוגה'] },
+      { char: '🍫', keywords: ['שוקולד'] },
+      { char: '🍿', keywords: ['פופקורן'] },
+      { char: '🥤', keywords: ['שתייה'] },
+      { char: '☕', keywords: ['קפה'] },
+      { char: '🍺', keywords: ['בירה'] },
+    ],
+  },
+  {
+    name: 'מסיבות ואירועים',
+    items: [
+      { char: '🎉', keywords: ['מסיבה', 'חגיגה'] },
+      { char: '🎊', keywords: ['קונפטי'] },
+      { char: '🎈', keywords: ['בלון'] },
+      { char: '🎁', keywords: ['מתנה'] },
+      { char: '🎀', keywords: ['סרט'] },
+      { char: '🥳', keywords: ['חגיגה'] },
+      { char: '🎆', keywords: ['זיקוקים'] },
+      { char: '🎇', keywords: ['זיקוקים'] },
+      { char: '🍾', keywords: ['שמפניה'] },
+      { char: '🥂', keywords: ['כוסות', 'לחיים'] },
+    ],
+  },
+  {
+    name: 'ספורט',
+    items: [
+      { char: '⚽', keywords: ['כדורגל'] },
+      { char: '🏀', keywords: ['כדורסל'] },
+      { char: '🏈', keywords: ['פוטבול'] },
+      { char: '⚾', keywords: ['בייסבול'] },
+      { char: '🎾', keywords: ['טניס'] },
+      { char: '🏐', keywords: ['כדורעף'] },
+      { char: '🏓', keywords: ['טניס שולחן'] },
+      { char: '🥊', keywords: ['אגרוף'] },
+      { char: '🏆', keywords: ['גביע', 'ניצחון'] },
+      { char: '🥇', keywords: ['מדליה', 'זהב'] },
+    ],
+  },
+  {
+    name: 'סמלים ולבבות',
+    items: [
+      { char: '❤️', keywords: ['לב', 'אהבה', 'אדום'] },
+      { char: '💛', keywords: ['לב', 'צהוב'] },
+      { char: '💚', keywords: ['לב', 'ירוק'] },
+      { char: '💙', keywords: ['לב', 'כחול'] },
+      { char: '💜', keywords: ['לב', 'סגול'] },
+      { char: '🖤', keywords: ['לב', 'שחור'] },
+      { char: '🤍', keywords: ['לב', 'לבן'] },
+      { char: '💔', keywords: ['לב שבור'] },
+      { char: '✨', keywords: ['נצנצים'] },
+      { char: '⭐', keywords: ['כוכב'] },
+      { char: '🌟', keywords: ['כוכב', 'זוהר'] },
+      { char: '🔥', keywords: ['אש'] },
+    ],
+  },
+  {
+    name: 'תחבורה',
+    items: [
+      { char: '🚗', keywords: ['מכונית'] },
+      { char: '🚕', keywords: ['מונית'] },
+      { char: '🚌', keywords: ['אוטובוס'] },
+      { char: '🚑', keywords: ['אמבולנס'] },
+      { char: '🚒', keywords: ['כבאית'] },
+      { char: '🚀', keywords: ['רקטה', 'חלל'] },
+      { char: '✈️', keywords: ['מטוס'] },
+      { char: '🚁', keywords: ['מסוק'] },
+      { char: '⛵', keywords: ['סירה'] },
+      { char: '🚲', keywords: ['אופניים'] },
+      { char: '🏍️', keywords: ['אופנוע'] },
+    ],
+  },
+  {
+    name: 'מזג אוויר',
+    items: [
+      { char: '🌤️', keywords: ['שמש', 'עננים'] },
+      { char: '⛅', keywords: ['עננים'] },
+      { char: '🌧️', keywords: ['גשם'] },
+      { char: '⛈️', keywords: ['סופה', 'רעם'] },
+      { char: '❄️', keywords: ['שלג'] },
+      { char: '🌈', keywords: ['קשת'] },
+      { char: '☔', keywords: ['מטריה'] },
+      { char: '🌙', keywords: ['ירח'] },
+    ],
+  },
+];
+
 const ALIGNS = [
   { key: 'right', label: 'ימין' },
   { key: 'center', label: 'מרכז' },
@@ -498,6 +639,8 @@ export default function Studio() {
   const [sat, setSat] = useState(100);
   const [light, setLight] = useState(50);
   const [openPanel, setOpenPanel] = useState<null | 'font' | 'color' | 'highlight'>(null);
+  const [graphicsOpen, setGraphicsOpen] = useState(false);
+  const [graphicsQuery, setGraphicsQuery] = useState('');
   const [zoomOpen, setZoomOpen] = useState(false);
 
   useEffect(() => {
@@ -973,6 +1116,9 @@ export default function Studio() {
               <Text style={st.deleteText}>🗑 מחיקה</Text>
             </Pressable>
           )}
+          <Pressable style={st.graphicsBtn} onPress={() => setGraphicsOpen(true)}>
+            <Text style={st.graphicsBtnText}>🖼 גרפיקות</Text>
+          </Pressable>
           <Pressable style={st.addTextBtn} onPress={addLayer}>
             <Text style={st.addTextBtnText}>+ הוספת טקסט</Text>
           </Pressable>
@@ -1128,6 +1274,77 @@ export default function Studio() {
           <Text style={st.zoomHint}>הקישו בכל מקום לסגירה</Text>
         </Pressable>
       </Modal>
+
+      {/* פאנל גרפיקות — כמו בקנבה: חיפוש + קטגוריות */}
+      <Modal visible={graphicsOpen} transparent animationType="slide" onRequestClose={() => setGraphicsOpen(false)}>
+        <View style={st.graphicsBackdrop}>
+          <View style={st.graphicsSheet}>
+            <View style={st.graphicsHeader}>
+              <Text style={st.graphicsTitle}>גרפיקות</Text>
+              <Pressable onPress={() => setGraphicsOpen(false)} hitSlop={8}>
+                <Text style={st.graphicsClose}>✕</Text>
+              </Pressable>
+            </View>
+            <TextInput
+              style={st.graphicsSearch}
+              value={graphicsQuery}
+              onChangeText={setGraphicsQuery}
+              placeholder="חיפוש — למשל: לב, כלב, פיצה…"
+              placeholderTextColor={C.textDim}
+            />
+            <ScrollView contentContainerStyle={st.graphicsScroll}>
+              {graphicsQuery.trim() ? (
+                (() => {
+                  const q = graphicsQuery.trim();
+                  const matches = GRAPHIC_CATEGORIES.flatMap((cat) =>
+                    cat.items.filter(
+                      (it) => it.keywords.some((k) => k.includes(q)) || cat.name.includes(q),
+                    ),
+                  );
+                  return matches.length === 0 ? (
+                    <Text style={st.graphicsEmpty}>לא נמצאו תוצאות — נסו מילה אחרת</Text>
+                  ) : (
+                    <View style={st.graphicsGrid}>
+                      {matches.map((it, i) => (
+                        <Pressable
+                          key={it.char + i}
+                          style={st.graphicCell}
+                          onPress={() => {
+                            addSymbol(it.char);
+                            setGraphicsOpen(false);
+                          }}
+                        >
+                          <Text style={st.graphicChar}>{it.char}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  );
+                })()
+              ) : (
+                GRAPHIC_CATEGORIES.map((cat) => (
+                  <View key={cat.name}>
+                    <Text style={st.graphicsCatTitle}>{cat.name}</Text>
+                    <View style={st.graphicsGrid}>
+                      {cat.items.map((it, i) => (
+                        <Pressable
+                          key={it.char + i}
+                          style={st.graphicCell}
+                          onPress={() => {
+                            addSymbol(it.char);
+                            setGraphicsOpen(false);
+                          }}
+                        >
+                          <Text style={st.graphicChar}>{it.char}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1257,6 +1474,52 @@ const st = StyleSheet.create({
     overflow: 'hidden',
   },
   zoomHint: { color: C.textDim, fontSize: 13, marginTop: S.md },
+  graphicsBackdrop: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
+  graphicsSheet: {
+    backgroundColor: C.bg,
+    borderTopLeftRadius: R.lg,
+    borderTopRightRadius: R.lg,
+    height: '80%',
+    padding: S.md,
+  },
+  graphicsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  graphicsTitle: { color: C.text, fontSize: 20, fontWeight: '800' },
+  graphicsClose: { color: C.textDim, fontSize: 20, fontWeight: '800' },
+  graphicsSearch: {
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: R.full,
+    color: C.text,
+    fontSize: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    textAlign: 'right',
+    marginTop: S.md,
+    marginBottom: S.sm,
+  },
+  graphicsScroll: { paddingBottom: S.xl },
+  graphicsCatTitle: {
+    color: C.text,
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'right',
+    marginTop: S.md,
+    marginBottom: S.sm,
+  },
+  graphicsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: S.sm },
+  graphicCell: {
+    width: 56,
+    height: 56,
+    borderRadius: R.md,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  graphicChar: { fontSize: 28 },
+  graphicsEmpty: { color: C.textDim, fontSize: 14, textAlign: 'center', marginTop: S.xl },
   symbolBtn: {
     width: 48,
     height: 48,
@@ -1301,6 +1564,14 @@ const st = StyleSheet.create({
   rowSpread: { flexDirection: 'row', justifyContent: 'flex-end', gap: S.sm, marginTop: S.md },
   addTextBtn: { backgroundColor: C.accent, borderRadius: R.full, paddingVertical: 11, paddingHorizontal: 20 },
   addTextBtnText: { color: C.onAccent, fontSize: 15, fontWeight: '800' },
+  graphicsBtn: {
+    borderRadius: R.full,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+    borderWidth: 1.5,
+    borderColor: C.accent,
+  },
+  graphicsBtnText: { color: C.accent, fontSize: 15, fontWeight: '800' },
   deleteBtn: {
     borderWidth: 1.5,
     borderColor: C.danger,
