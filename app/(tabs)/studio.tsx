@@ -80,6 +80,15 @@ const TEXT_COLORS = [
   '#37a7ff', '#ff7a00', '#a259ff', '#00d1c1', '#c0c0c0',
 ];
 
+// רשת צבעים רחבה (בסגנון קנבה) לפאנל "צבע טקסט" — שורת גווני אפור + 3 שורות גוונים
+const PALETTE_GRAY = ['#ffffff', '#d9d9d9', '#b4b4b4', '#808080', '#4d4d4d', '#262626', '#000000'];
+// שורות גוונים מלאות — צבע קבוע לכל שורה, 7 גוני בהירות (בהיר→כהה) בכל אחת, כמו הרשת המלאה של קנבה
+function buildHueRow(hue: number, sat = 80): string[] {
+  return [92, 76, 60, 46, 32, 18, 6].map((l) => hslToHex(hue, sat, l));
+}
+const PALETTE_HUES = [225, 255, 270, 288, 325, 355, 3, 25, 45, 80, 105, 140, 155, 175, 190, 205, 215];
+const PALETTE_GRID: string[][] = [PALETTE_GRAY, ...PALETTE_HUES.map((h) => buildHueRow(h))];
+
 const HIGHLIGHTS: (string | null)[] = [null, '#000000', '#ffffff', '#00fc25', '#ffd400', '#ff3b6b'];
 
 type Graphic = { char: string; keywords: string[] };
@@ -1925,15 +1934,19 @@ export default function Studio() {
 
             {openPanel === 'color' && (
               <View>
-                <View style={st.row}>
-                  {TEXT_COLORS.map((c) => (
-                    <Pressable
-                      key={c}
-                      onPress={() => updateSelected({ color: c })}
-                      style={[st.swatchSm, { backgroundColor: c }, selected.color === c && st.swatchActive]}
-                    />
+                <ScrollView style={st.paletteScroll} nestedScrollEnabled showsVerticalScrollIndicator>
+                  {PALETTE_GRID.map((row, ri) => (
+                    <View style={st.row} key={ri}>
+                      {row.map((c, ci) => (
+                        <Pressable
+                          key={c + ci}
+                          onPress={() => updateSelected({ color: c })}
+                          style={[st.swatchSm, { backgroundColor: c }, selected.color === c && st.swatchActive]}
+                        />
+                      ))}
+                    </View>
                   ))}
-                </View>
+                </ScrollView>
                 <Pressable
                   style={[st.outlineBtn, customOpen && st.btnActive]}
                   onPress={() => setCustomOpen((v) => !v)}
@@ -2187,6 +2200,20 @@ export default function Studio() {
           ))}
         </View>
         <Text style={st.hint}>{shirt.name}</Text>
+
+        <ScrollView style={st.paletteScroll} nestedScrollEnabled showsVerticalScrollIndicator>
+          {PALETTE_GRID.map((row, ri) => (
+            <View style={st.row} key={ri}>
+              {row.map((c, ci) => (
+                <Pressable
+                  key={c + ci}
+                  onPress={() => setShirt({ name: 'מותאם אישית', hex: c })}
+                  style={[st.swatchSm, { backgroundColor: c }, shirt.hex === c && st.swatchActive]}
+                />
+              ))}
+            </View>
+          ))}
+        </ScrollView>
 
         <Pressable
           style={[st.outlineBtn, shirtCustomOpen && st.btnActive]}
@@ -2835,6 +2862,7 @@ const st = StyleSheet.create({
   },
   zOrderText: { color: C.text, fontSize: 13, fontWeight: '700' },
   boldText: { color: C.textDim, fontSize: 17, fontWeight: '900' },
+  paletteScroll: { maxHeight: 220 },
   italicText: { color: C.textDim, fontSize: 17, fontStyle: 'italic', fontWeight: '600' },
   underlineText: { color: C.textDim, fontSize: 15, fontWeight: '700', textDecorationLine: 'underline' },
   strikeText: { color: C.textDim, fontSize: 15, fontWeight: '700', textDecorationLine: 'line-through' },
