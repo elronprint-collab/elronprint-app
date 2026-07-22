@@ -276,6 +276,10 @@ function DraggableText({
   const layerRef = useRef(layer);
   layerRef.current = layer;
   const measuredRef = useRef({ w: 100, h: 30 });
+  // מצב לרינדור מיקום הידיות בפיקסלים — נדרש בנייד: אחוזים (%) ביחס לתיבה שמתאימה עצמה
+  // אוטומטית לתוכן (auto-size) לא נפתרים באופן אמין ב-Yoga/RN Native כמו בדפדפן,
+  // ולכן שם הידיות "זזות" ולא נשארות במקום. פיקסלים מדויקים פותרים את זה בשתי הפלטפורמות.
+  const [measured, setMeasured] = useState({ w: 100, h: 30 });
 
   const pan = useRef(
     PanResponder.create({
@@ -333,7 +337,9 @@ function DraggableText({
     <View
       {...pan.panHandlers}
       onLayout={(e) => {
-        measuredRef.current = { w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height };
+        const next = { w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height };
+        measuredRef.current = next;
+        setMeasured(next);
       }}
       style={[
         st.layerWrap,
@@ -373,24 +379,30 @@ function DraggableText({
         {layer.text}
       </Text>
       {selected &&
-        HANDLES.map(({ kind, leftPct, topPct, glyph }) => (
-          <View
-            key={kind}
-            {...(Platform.OS === 'web'
-              ? webHandleHandlers(kind, layerRef, measuredRef, onResize, onDragStart, onDragEnd)
-              : handlePanByKind[kind].panHandlers)}
-            style={[
-              st.resizeHandle,
-              {
-                left: `${leftPct}%` as never,
-                top: `${topPct}%` as never,
-                transform: [{ translateX: '-50%' as never }, { translateY: '-50%' as never }],
-              },
-            ]}
-          >
-            <Text style={st.resizeHandleText}>{glyph}</Text>
-          </View>
-        ))}
+        HANDLES.map(({ kind, leftPct, topPct }) => {
+          const isCorner = kind.length === 2;
+          const isVerticalBar = kind === 'w' || kind === 'e';
+          const shape = isCorner ? st.handleCorner : isVerticalBar ? st.handleBarV : st.handleBarH;
+          return (
+            <View
+              key={kind}
+              {...(Platform.OS === 'web'
+                ? webHandleHandlers(kind, layerRef, measuredRef, onResize, onDragStart, onDragEnd)
+                : handlePanByKind[kind].panHandlers)}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={[
+                st.resizeHandleHit,
+                {
+                  left: (leftPct / 100) * measured.w,
+                  top: (topPct / 100) * measured.h,
+                  transform: [{ translateX: '-50%' as never }, { translateY: '-50%' as never }],
+                },
+              ]}
+            >
+              <View style={shape} />
+            </View>
+          );
+        })}
     </View>
   );
 }
@@ -1178,18 +1190,37 @@ const st = StyleSheet.create({
     justifyContent: 'center',
   },
   removeImgText: { color: C.danger, fontSize: 18, fontWeight: '800' },
-  resizeHandle: {
+  resizeHandleHit: {
     position: 'absolute',
-    width: 30,
-    height: 30,
-    borderRadius: R.full,
-    backgroundColor: C.accent,
+    width: 22,
+    height: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: C.bg,
   },
-  resizeHandleText: { color: C.onAccent, fontSize: 13, fontWeight: '800' },
+  handleCorner: {
+    width: 11,
+    height: 11,
+    borderRadius: 2,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: C.accent,
+  },
+  handleBarH: {
+    width: 18,
+    height: 8,
+    borderRadius: 2,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: C.accent,
+  },
+  handleBarV: {
+    width: 8,
+    height: 18,
+    borderRadius: 2,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: C.accent,
+  },
   zoomBackdrop: {
     flex: 1,
     backgroundColor: '#000000ee',
