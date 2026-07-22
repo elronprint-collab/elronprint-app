@@ -15,11 +15,28 @@ export type DesignLayer = {
   bold: boolean;
   highlight: string | null;
   outline: boolean;
+  opacity: number;
+  shadow: boolean;
+  lineHeight: number;
+  flipH: boolean;
+  flipV: boolean;
+};
+
+export type CartImageTransform = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rotation: number;
+  flipH: boolean;
+  flipV: boolean;
+  opacity: number;
 };
 
 export type CartDesign = {
   shirtHex: string;
   image: string | null;
+  imageTransform?: CartImageTransform;
   layers: DesignLayer[];
 };
 

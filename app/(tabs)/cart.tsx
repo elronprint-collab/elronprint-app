@@ -20,10 +20,30 @@ import { C, R, S } from '../../lib/theme';
 const MINI = 0.34;
 
 function MiniPreview({ design }: { design: CartDesign }) {
+  const it = design.imageTransform;
   return (
     <View style={[st.mini, { backgroundColor: design.shirtHex }]}>
       <View style={st.miniArea}>
-        {design.image && <Image source={{ uri: design.image }} style={st.miniImg} contentFit="contain" />}
+        {design.image && it && (
+          <View
+            style={{
+              position: 'absolute',
+              left: (it.x - it.w / 2) * MINI,
+              top: (it.y - it.h / 2) * MINI,
+              width: it.w * MINI,
+              height: it.h * MINI,
+              opacity: it.opacity / 100,
+              transform: [
+                { rotate: `${it.rotation}deg` },
+                { scaleX: it.flipH ? -1 : 1 },
+                { scaleY: it.flipV ? -1 : 1 },
+              ],
+            }}
+          >
+            <Image source={{ uri: design.image }} style={st.miniImg} contentFit="contain" />
+          </View>
+        )}
+        {design.image && !it && <Image source={{ uri: design.image }} style={st.miniImg} contentFit="contain" />}
         {design.layers.map((l, i) => (
           <View
             key={i}
@@ -32,10 +52,13 @@ function MiniPreview({ design }: { design: CartDesign }) {
               left: l.x * MINI,
               top: l.y * MINI,
               width: l.width != null ? l.width * MINI : undefined,
+              opacity: l.opacity / 100,
               transform: [
                 { translateX: '-50%' as never },
                 { translateY: '-50%' as never },
                 { rotate: `${l.rotation}deg` },
+                { scaleX: l.flipH ? -1 : 1 },
+                { scaleY: l.flipV ? -1 : 1 },
               ],
             }}
           >
@@ -45,11 +68,17 @@ function MiniPreview({ design }: { design: CartDesign }) {
                   fontFamily: l.fontFamily,
                   color: l.color,
                   fontSize: Math.max(6, l.size * MINI),
+                  lineHeight: Math.max(7, l.size * l.lineHeight * MINI),
                   textAlign: l.align,
                   letterSpacing: l.spacing * MINI,
                   fontWeight: l.bold ? '700' : 'normal',
                 },
                 l.highlight != null && { backgroundColor: l.highlight, paddingHorizontal: 2 },
+                l.shadow && {
+                  textShadowColor: '#00000099',
+                  textShadowRadius: 2,
+                  textShadowOffset: { width: 1, height: 1 },
+                },
               ]}
               numberOfLines={2}
             >

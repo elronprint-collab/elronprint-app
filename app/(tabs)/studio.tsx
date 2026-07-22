@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   I18nManager,
+  Image as RNImage,
   Modal,
   PanResponder,
   Platform,
@@ -27,9 +28,6 @@ import { C, R, S } from '../../lib/theme';
 const SHIRT_COLORS = [
   { name: 'שחור', hex: '#1b1b1b' },
   { name: 'לבן', hex: '#f2f2f2' },
-  { name: 'אפור', hex: '#8a8a8a' },
-  { name: 'כחול נייבי', hex: '#1d2a4d' },
-  { name: 'אדום', hex: '#b3202a' },
 ];
 
 const SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL'];
@@ -65,6 +63,17 @@ function hslToHex(h: number, s: number, l: number): string {
   return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
 }
 
+// מרחק גס בין שני צבעים (0-441) — לבדיקת ניגודיות בסיסית בין טקסט לחולצה
+function colorDistance(hexA: string, hexB: string): number {
+  const parse = (hex: string) => {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0, 2), 16) || 0, parseInt(h.slice(2, 4), 16) || 0, parseInt(h.slice(4, 6), 16) || 0];
+  };
+  const [r1, g1, b1] = parse(hexA);
+  const [r2, g2, b2] = parse(hexB);
+  return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
+}
+
 const TEXT_COLORS = [
   '#ffffff', '#000000', '#00fc25', '#ffd400', '#ff3b6b',
   '#37a7ff', '#ff7a00', '#a259ff', '#00d1c1', '#c0c0c0',
@@ -72,12 +81,27 @@ const TEXT_COLORS = [
 
 const HIGHLIGHTS: (string | null)[] = [null, '#000000', '#ffffff', '#00fc25', '#ffd400', '#ff3b6b'];
 
-const SYMBOLS = ['❤️', '⚡', '👑', '⭐', '🔥', '😎', '🎉', '🦄', '⚽', '🎸', '💪', '🌈'];
-
 type Graphic = { char: string; keywords: string[] };
 type GraphicCategory = { name: string; items: Graphic[] };
 
 const GRAPHIC_CATEGORIES: GraphicCategory[] = [
+  {
+    name: 'מועדפים',
+    items: [
+      { char: '❤️', keywords: ['לב', 'אהבה'] },
+      { char: '⚡', keywords: ['ברק', 'חשמל'] },
+      { char: '👑', keywords: ['כתר'] },
+      { char: '⭐', keywords: ['כוכב'] },
+      { char: '🔥', keywords: ['אש'] },
+      { char: '😎', keywords: ['משקפי שמש', 'מגניב'] },
+      { char: '🎉', keywords: ['מסיבה', 'חגיגה'] },
+      { char: '🦄', keywords: ['חד קרן'] },
+      { char: '⚽', keywords: ['כדורגל'] },
+      { char: '🎸', keywords: ['גיטרה'] },
+      { char: '💪', keywords: ['שריר', 'כוח'] },
+      { char: '🌈', keywords: ['קשת'] },
+    ],
+  },
   {
     name: 'פרחים וטבע',
     items: [
@@ -242,9 +266,39 @@ type Layer = {
   highlight: string | null;
   spacing: number;
   width?: number; // רוחב מפורש של תיבת הטקסט — נקבע כשגוררים ידית צד/פינה
+  locked: boolean;
+  opacity: number; // 0-100
+  shadow: boolean;
+  lineHeight: number; // מכפיל (1.0-2.0) על גודל הפונט
+  flipH: boolean;
+  flipV: boolean;
 };
 
 type HandleKind = 'nw' | 'n' | 'ne' | 'w' | 'e' | 'sw' | 's' | 'se';
+
+type ImgTransform = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rotation: number;
+  flipH: boolean;
+  flipV: boolean;
+  opacity: number;
+  locked: boolean;
+};
+
+const DEFAULT_IMG: ImgTransform = {
+  x: AREA_W / 2,
+  y: AREA_H / 2,
+  w: 150,
+  h: 150,
+  rotation: 0,
+  flipH: false,
+  flipV: false,
+  opacity: 100,
+  locked: false,
+};
 
 const HANDLES: { kind: HandleKind; leftPct: number; topPct: number; glyph: string }[] = [
   { kind: 'nw', leftPct: 0, topPct: 0, glyph: '⤡' },
@@ -307,6 +361,225 @@ function computeResizePatch(
   }
 }
 
+const MIN_IMG_SIZE = 30;
+const MAX_IMG_SIZE = AREA_W - 6;
+
+// מחשב שינוי רוחב/גובה/מיקום לתמונה לפי כיוון הידית — פינות שומרות על יחס הממדים
+function computeImageResizePatch(
+  kind: HandleKind,
+  dx: number,
+  dy: number,
+  base: { w: number; h: number; x: number; y: number },
+): Partial<ImgTransform> {
+  const aspect = base.w / base.h;
+  switch (kind) {
+    case 'se': {
+      const diag = (dx + dy) / 2;
+      const w = clamp(Math.round(base.w + diag), MIN_IMG_SIZE, MAX_IMG_SIZE);
+      return { w, h: Math.round(w / aspect) };
+    }
+    case 'sw': {
+      const diag = (-dx + dy) / 2;
+      const w = clamp(Math.round(base.w + diag), MIN_IMG_SIZE, MAX_IMG_SIZE);
+      return { w, h: Math.round(w / aspect) };
+    }
+    case 'ne': {
+      const diag = (dx - dy) / 2;
+      const w = clamp(Math.round(base.w + diag), MIN_IMG_SIZE, MAX_IMG_SIZE);
+      return { w, h: Math.round(w / aspect) };
+    }
+    case 'nw': {
+      const diag = (-dx - dy) / 2;
+      const w = clamp(Math.round(base.w + diag), MIN_IMG_SIZE, MAX_IMG_SIZE);
+      return { w, h: Math.round(w / aspect) };
+    }
+    case 'e':
+      return { w: clamp(Math.round(base.w + dx), MIN_IMG_SIZE, MAX_IMG_SIZE), x: Math.round(base.x + dx / 2) };
+    case 'w':
+      return { w: clamp(Math.round(base.w - dx), MIN_IMG_SIZE, MAX_IMG_SIZE), x: Math.round(base.x + dx / 2) };
+    case 's':
+      return { h: clamp(Math.round(base.h + dy), MIN_IMG_SIZE, MAX_IMG_SIZE), y: Math.round(base.y + dy / 2) };
+    case 'n':
+      return { h: clamp(Math.round(base.h - dy), MIN_IMG_SIZE, MAX_IMG_SIZE), y: Math.round(base.y + dy / 2) };
+  }
+}
+
+function useImageHandleResponder(
+  kind: HandleKind,
+  imgRef: MutableRefObject<ImgTransform>,
+  onResize: (patch: Partial<ImgTransform>) => void,
+  onDragStart: () => void,
+  onDragEnd: () => void,
+) {
+  const base = useRef({ w: 0, h: 0, x: 0, y: 0 });
+  return useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => !imgRef.current.locked,
+      onStartShouldSetPanResponderCapture: () => !imgRef.current.locked,
+      onMoveShouldSetPanResponder: () => !imgRef.current.locked,
+      onMoveShouldSetPanResponderCapture: () => !imgRef.current.locked,
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
+      onPanResponderGrant: () => {
+        base.current = { w: imgRef.current.w, h: imgRef.current.h, x: imgRef.current.x, y: imgRef.current.y };
+        onDragStart();
+      },
+      onPanResponderMove: (_e, g) => {
+        onResize(computeImageResizePatch(kind, g.dx, g.dy, base.current));
+      },
+      onPanResponderRelease: onDragEnd,
+      onPanResponderTerminate: onDragEnd,
+    }),
+  ).current;
+}
+
+function webImageHandleHandlers(
+  kind: HandleKind,
+  imgRef: MutableRefObject<ImgTransform>,
+  onResize: (patch: Partial<ImgTransform>) => void,
+  onDragStart: () => void,
+  onDragEnd: () => void,
+) {
+  return {
+    onMouseDown: (e: any) => {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+      const base = { w: imgRef.current.w, h: imgRef.current.h, x: imgRef.current.x, y: imgRef.current.y };
+      const startX = e.clientX;
+      const startY = e.clientY;
+      onDragStart();
+      const onMove = (ev: MouseEvent) => {
+        onResize(computeImageResizePatch(kind, ev.clientX - startX, ev.clientY - startY, base));
+      };
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        onDragEnd();
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+  };
+}
+
+function DraggableImage({
+  uri,
+  img,
+  selected,
+  onSelect,
+  onMove,
+  onResize,
+  onDragStart,
+  onDragEnd,
+}: {
+  uri: string;
+  img: ImgTransform;
+  selected: boolean;
+  onSelect: () => void;
+  onMove: (x: number, y: number) => void;
+  onResize: (patch: Partial<ImgTransform>) => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+}) {
+  const start = useRef({ x: img.x, y: img.y });
+  const imgRef = useRef(img);
+  imgRef.current = img;
+
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => !imgRef.current.locked,
+      onMoveShouldSetPanResponder: (_e, g) => !imgRef.current.locked && Math.abs(g.dx) + Math.abs(g.dy) > 2,
+      onPanResponderGrant: () => {
+        start.current = { x: imgRef.current.x, y: imgRef.current.y };
+        onDragStart();
+        onSelect();
+      },
+      onPanResponderMove: (_e, g) => {
+        const nx = Math.min(AREA_W - 8, Math.max(8, start.current.x + g.dx));
+        const ny = Math.min(AREA_H - 8, Math.max(8, start.current.y + g.dy));
+        onMove(nx, ny);
+      },
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderRelease: onDragEnd,
+      onPanResponderTerminate: onDragEnd,
+    }),
+  ).current;
+
+  const panNW = useImageHandleResponder('nw', imgRef, onResize, onDragStart, onDragEnd);
+  const panN = useImageHandleResponder('n', imgRef, onResize, onDragStart, onDragEnd);
+  const panNE = useImageHandleResponder('ne', imgRef, onResize, onDragStart, onDragEnd);
+  const panW = useImageHandleResponder('w', imgRef, onResize, onDragStart, onDragEnd);
+  const panE = useImageHandleResponder('e', imgRef, onResize, onDragStart, onDragEnd);
+  const panSW = useImageHandleResponder('sw', imgRef, onResize, onDragStart, onDragEnd);
+  const panS = useImageHandleResponder('s', imgRef, onResize, onDragStart, onDragEnd);
+  const panSE = useImageHandleResponder('se', imgRef, onResize, onDragStart, onDragEnd);
+  const handlePanByKind: Record<HandleKind, ReturnType<typeof useImageHandleResponder>> = {
+    nw: panNW,
+    n: panN,
+    ne: panNE,
+    w: panW,
+    e: panE,
+    sw: panSW,
+    s: panS,
+    se: panSE,
+  };
+
+  start.current = selected ? start.current : { x: img.x, y: img.y };
+
+  return (
+    <View
+      {...pan.panHandlers}
+      style={{
+        position: 'absolute',
+        left: img.x - img.w / 2,
+        top: img.y - img.h / 2,
+        width: img.w,
+        height: img.h,
+        opacity: img.opacity / 100,
+        transform: [
+          { rotate: `${img.rotation}deg` },
+          { scaleX: img.flipH ? -1 : 1 },
+          { scaleY: img.flipV ? -1 : 1 },
+        ],
+      }}
+    >
+      <Image source={{ uri }} style={st.printImg} contentFit="contain" />
+      {selected && <View style={st.imgSelectedBorder} pointerEvents="none" />}
+      {img.locked && selected && (
+        <View style={st.lockBadge}>
+          <Text style={st.lockBadgeText}>🔒</Text>
+        </View>
+      )}
+      {selected &&
+        !img.locked &&
+        HANDLES.map(({ kind, leftPct, topPct }) => {
+          const isCorner = kind.length === 2;
+          const isVerticalBar = kind === 'w' || kind === 'e';
+          const shape = isCorner ? st.handleCorner : isVerticalBar ? st.handleBarV : st.handleBarH;
+          const HIT = 22;
+          return (
+            <View
+              key={kind}
+              {...(Platform.OS === 'web'
+                ? webImageHandleHandlers(kind, imgRef, onResize, onDragStart, onDragEnd)
+                : handlePanByKind[kind].panHandlers)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={[
+                st.resizeHandleHit,
+                {
+                  left: (leftPct / 100) * img.w - HIT / 2,
+                  top: (topPct / 100) * img.h - HIT / 2,
+                },
+              ]}
+            >
+              <View style={shape} />
+            </View>
+          );
+        })}
+    </View>
+  );
+}
+
 let nextId = 1;
 
 function newLayer(): Layer {
@@ -324,6 +597,12 @@ function newLayer(): Layer {
     align: 'center',
     highlight: null,
     spacing: 0,
+    locked: false,
+    opacity: 100,
+    shadow: false,
+    lineHeight: 1.2,
+    flipH: false,
+    flipV: false,
   };
 }
 
@@ -404,6 +683,7 @@ function DraggableText({
   onResize,
   onDragStart,
   onDragEnd,
+  onMeasured,
 }: {
   layer: Layer;
   selected: boolean;
@@ -412,6 +692,7 @@ function DraggableText({
   onResize: (patch: Partial<Layer>) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
+  onMeasured?: (w: number, h: number) => void;
 }) {
   const start = useRef({ x: layer.x, y: layer.y });
   const layerRef = useRef(layer);
@@ -424,8 +705,8 @@ function DraggableText({
 
   const pan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) + Math.abs(g.dy) > 2,
+      onStartShouldSetPanResponder: () => !layerRef.current.locked,
+      onMoveShouldSetPanResponder: (_e, g) => !layerRef.current.locked && Math.abs(g.dx) + Math.abs(g.dy) > 2,
       onPanResponderGrant: () => {
         start.current = { x: layerRef.current.x, y: layerRef.current.y };
         onDragStart();
@@ -464,15 +745,19 @@ function DraggableText({
 
   start.current = selected ? start.current : { x: layer.x, y: layer.y };
 
-  const shadow = layer.outline
+  const textShadow = layer.outline
     ? {
         textShadowColor: layer.color === '#000000' ? '#ffffff' : '#000000',
         textShadowRadius: 3,
         textShadowOffset: { width: 0, height: 0 },
       }
-    : layer.bold
-      ? { textShadowColor: layer.color, textShadowRadius: 0.8, textShadowOffset: { width: 0, height: 0 } }
-      : null;
+    : layer.shadow
+      ? { textShadowColor: '#00000099', textShadowRadius: 4, textShadowOffset: { width: 2, height: 3 } }
+      : layer.bold
+        ? { textShadowColor: layer.color, textShadowRadius: 0.8, textShadowOffset: { width: 0, height: 0 } }
+        : null;
+
+  const canEditHandles = selected && !layer.locked;
 
   return (
     <View
@@ -481,6 +766,7 @@ function DraggableText({
         const next = { w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height };
         measuredRef.current = next;
         setMeasured(next);
+        onMeasured?.(next.w, next.h);
       }}
       style={[
         st.layerWrap,
@@ -488,10 +774,13 @@ function DraggableText({
         {
           left: layer.x,
           top: layer.y,
+          opacity: layer.opacity / 100,
           transform: [
             { translateX: '-50%' as never },
             { translateY: '-50%' as never },
             { rotate: `${layer.rotation}deg` },
+            { scaleX: layer.flipH ? -1 : 1 },
+            { scaleY: layer.flipV ? -1 : 1 },
           ],
         },
         selected && st.layerSelected,
@@ -503,6 +792,7 @@ function DraggableText({
             fontFamily: layer.font.family,
             color: layer.color,
             fontSize: layer.size,
+            lineHeight: Math.round(layer.size * layer.lineHeight),
             textAlign: layer.align,
             letterSpacing: layer.spacing,
             fontWeight: layer.bold ? '700' : 'normal',
@@ -513,13 +803,18 @@ function DraggableText({
             paddingVertical: 2,
             borderRadius: 3,
           },
-          shadow,
+          textShadow,
         ]}
         numberOfLines={layer.width != null ? undefined : 3}
       >
         {layer.text}
       </Text>
-      {selected &&
+      {layer.locked && selected && (
+        <View style={st.lockBadge}>
+          <Text style={st.lockBadgeText}>🔒</Text>
+        </View>
+      )}
+      {canEditHandles &&
         HANDLES.map(({ kind, leftPct, topPct }) => {
           const isCorner = kind.length === 2;
           const isVerticalBar = kind === 'w' || kind === 'e';
@@ -555,6 +850,10 @@ export default function Studio() {
   const [size, setSize] = useState('M');
   const [localImg, setLocalImg] = useState<string | null>(null);
   const [cloudUrl, setCloudUrl] = useState<string | null>(null);
+  const [img, setImg] = useState<ImgTransform>(DEFAULT_IMG);
+  const [imageSelected, setImageSelected] = useState(false);
+  const [naturalImgSize, setNaturalImgSize] = useState<{ w: number; h: number } | null>(null);
+  const [hasTransparency, setHasTransparency] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [ordering, setOrdering] = useState(false);
   const [aiBusy, setAiBusy] = useState<null | 'bg' | 'up' | 'remix'>(null);
@@ -564,19 +863,20 @@ export default function Studio() {
   const selected = layers.find((l) => l.id === selectedId) ?? null;
 
   // ביטול / חזרה
-  type Snap = { layers: Layer[]; localImg: string | null; cloudUrl: string | null };
+  type Snap = { layers: Layer[]; localImg: string | null; cloudUrl: string | null; img: ImgTransform };
   const past = useRef<Snap[]>([]);
   const future = useRef<Snap[]>([]);
   const [, forceHistory] = useState(0);
 
   function currentSnap(): Snap {
-    return { layers: layers.map((l) => ({ ...l })), localImg, cloudUrl };
+    return { layers: layers.map((l) => ({ ...l })), localImg, cloudUrl, img: { ...img } };
   }
 
   function applySnap(sn: Snap) {
     setLayers(sn.layers);
     setLocalImg(sn.localImg);
     setCloudUrl(sn.cloudUrl);
+    setImg(sn.img);
     if (selectedId != null && !sn.layers.some((l) => l.id === selectedId)) setSelectedId(null);
   }
 
@@ -607,6 +907,31 @@ export default function Studio() {
     snapshot();
     setLocalImg(null);
     setCloudUrl(null);
+    setImg(DEFAULT_IMG);
+    setImageSelected(false);
+    setNaturalImgSize(null);
+    setHasTransparency(false);
+  }
+
+  // מתאים את תיבת התמונה לגודל טבעי (שומר על יחס הממדים), וגם שומר את הרזולוציה האמיתית
+  // לצורך בדיקת איכות ההדפסה
+  function fitImageBox(url: string) {
+    RNImage.getSize(
+      url,
+      (w, h) => {
+        setNaturalImgSize({ w, h });
+        const ratio = w / h;
+        let dw = 150;
+        let dh = dw / ratio;
+        const maxH = AREA_H - 20;
+        if (dh > maxH) {
+          dh = maxH;
+          dw = dh * ratio;
+        }
+        setImg((prev) => ({ ...prev, w: Math.round(dw), h: Math.round(dh), x: AREA_W / 2, y: AREA_H / 2 }));
+      },
+      () => {},
+    );
   }
 
   function updateSelected(patch: Partial<Layer>, withSnapshot = true) {
@@ -629,6 +954,99 @@ export default function Studio() {
     setSelectedId(null);
   }
 
+  function updateImg(patch: Partial<ImgTransform>, withSnapshot = true) {
+    if (withSnapshot) snapshot();
+    setImg((prev) => ({ ...prev, ...patch }));
+  }
+
+  // סדר שכבות — הבאה לפנים / שליחה לאחור (בין הטקסטים/גרפיקות בינם לבין עצמם)
+  function bringToFront() {
+    if (selectedId == null) return;
+    snapshot();
+    setLayers((ls) => {
+      const idx = ls.findIndex((l) => l.id === selectedId);
+      if (idx < 0 || idx === ls.length - 1) return ls;
+      const copy = [...ls];
+      const [item] = copy.splice(idx, 1);
+      copy.push(item);
+      return copy;
+    });
+  }
+
+  function sendToBack() {
+    if (selectedId == null) return;
+    snapshot();
+    setLayers((ls) => {
+      const idx = ls.findIndex((l) => l.id === selectedId);
+      if (idx <= 0) return ls;
+      const copy = [...ls];
+      const [item] = copy.splice(idx, 1);
+      copy.unshift(item);
+      return copy;
+    });
+  }
+
+  // מיקום התיבה של השכבה הנבחרת (נמדד בפועל דרך onLayout ב-DraggableText)
+  const layerSizeRef = useRef<Record<number, { w: number; h: number }>>({});
+
+  // יישור השכבה הנבחרת ביחס לאזור ההדפסה
+  function alignLayer(kind: 'left' | 'centerX' | 'right' | 'top' | 'centerY' | 'bottom') {
+    if (selectedId == null) return;
+    const dims = layerSizeRef.current[selectedId] ?? { w: 80, h: 30 };
+    const margin = 10;
+    let patch: Partial<Layer> = {};
+    switch (kind) {
+      case 'left':
+        patch = { x: margin + dims.w / 2 };
+        break;
+      case 'centerX':
+        patch = { x: AREA_W / 2 };
+        break;
+      case 'right':
+        patch = { x: AREA_W - margin - dims.w / 2 };
+        break;
+      case 'top':
+        patch = { y: margin + dims.h / 2 };
+        break;
+      case 'centerY':
+        patch = { y: AREA_H / 2 };
+        break;
+      case 'bottom':
+        patch = { y: AREA_H - margin - dims.h / 2 };
+        break;
+    }
+    updateSelected(patch);
+  }
+
+  function centerLayerOnShirt() {
+    if (selectedId == null) return;
+    updateSelected({ x: AREA_W / 2, y: AREA_H / 2 });
+  }
+
+  function alignImage(kind: 'left' | 'centerX' | 'right' | 'top' | 'centerY' | 'bottom') {
+    const margin = 6;
+    switch (kind) {
+      case 'left':
+        updateImg({ x: margin + img.w / 2 });
+        break;
+      case 'centerX':
+        updateImg({ x: AREA_W / 2 });
+        break;
+      case 'right':
+        updateImg({ x: AREA_W - margin - img.w / 2 });
+        break;
+      case 'top':
+        updateImg({ y: margin + img.h / 2 });
+        break;
+      case 'centerY':
+        updateImg({ y: AREA_H / 2 });
+        break;
+      case 'bottom':
+        updateImg({ y: AREA_H - margin - img.h / 2 });
+        break;
+    }
+  }
+
   const textEditSnapped = useRef(false);
 
   // השראה מהחנות + זום
@@ -638,7 +1056,11 @@ export default function Studio() {
   const [hue, setHue] = useState(120);
   const [sat, setSat] = useState(100);
   const [light, setLight] = useState(50);
-  const [openPanel, setOpenPanel] = useState<null | 'font' | 'color' | 'highlight'>(null);
+  const [shirtCustomOpen, setShirtCustomOpen] = useState(false);
+  const [shirtHue, setShirtHue] = useState(0);
+  const [shirtSat, setShirtSat] = useState(0);
+  const [shirtLight, setShirtLight] = useState(50);
+  const [openPanel, setOpenPanel] = useState<null | 'font' | 'color' | 'highlight' | 'more' | 'align'>(null);
   const [graphicsOpen, setGraphicsOpen] = useState(false);
   const [graphicsQuery, setGraphicsQuery] = useState('');
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -664,9 +1086,11 @@ export default function Studio() {
     setLocalImg(p.image);
     setUploading(true);
     setCloudUrl(null);
+    setHasTransparency(false);
     try {
       const url = await uploadRemote(p.image);
       setCloudUrl(url);
+      fitImageBox(url);
     } catch {
       Alert.alert('שגיאה', 'טעינת העיצוב נכשלה, נסו שוב');
       setLocalImg(null);
@@ -688,6 +1112,8 @@ export default function Studio() {
     setLocalImg(uri);
     setUploading(true);
     setCloudUrl(null);
+    setHasTransparency(false);
+    fitImageBox(uri);
     try {
       const url = await uploadImage(uri);
       setCloudUrl(url);
@@ -711,6 +1137,8 @@ export default function Studio() {
       } catch {}
       setLocalImg(resultUrl);
       setCloudUrl(resultUrl);
+      fitImageBox(resultUrl);
+      if (kind === 'bg') setHasTransparency(true);
     } catch (e) {
       Alert.alert('שגיאה', e instanceof Error ? e.message : 'הפעולה נכשלה, נסו שוב');
     } finally {
@@ -752,11 +1180,30 @@ export default function Studio() {
             l.highlight ? `רקע ${l.highlight}` : '',
             l.spacing > 0 ? `ריווח ${l.spacing}` : '',
             l.outline ? 'מתאר' : '',
+            l.shadow ? 'צל' : '',
+            l.opacity !== 100 ? `שקיפות ${l.opacity}%` : '',
+            l.lineHeight !== 1.2 ? `מרווח שורות ${l.lineHeight.toFixed(1)}` : '',
+            l.flipH ? 'הפוך אופקית' : '',
+            l.flipV ? 'הפוך אנכית' : '',
+            l.locked ? 'נעול' : '',
           ]
             .filter(Boolean)
             .join(' · ');
           attributes.push({ key: `טקסט ${i + 1}`, value: l.text.trim() }, { key: `טקסט ${i + 1} — עיצוב`, value: details });
         });
+      if (cloudUrl) {
+        const imgDetails = [
+          `גודל ${img.w}×${img.h}px`,
+          `מיקום ${Math.round((img.x / AREA_W) * 100)}%,${Math.round((img.y / AREA_H) * 100)}%`,
+          img.rotation !== 0 ? `סיבוב ${img.rotation}°` : '',
+          img.flipH ? 'הפוך אופקית' : '',
+          img.flipV ? 'הפוך אנכית' : '',
+          img.opacity !== 100 ? `שקיפות ${img.opacity}%` : '',
+        ]
+          .filter(Boolean)
+          .join(' · ');
+        attributes.push({ key: 'תמונה — מיקום ועיצוב', value: imgDetails });
+      }
 
       cart.add({
         variantId: variant.id,
@@ -766,6 +1213,18 @@ export default function Studio() {
         design: {
           shirtHex: shirt.hex,
           image: cloudUrl,
+          imageTransform: cloudUrl
+            ? {
+                x: img.x,
+                y: img.y,
+                w: img.w,
+                h: img.h,
+                rotation: img.rotation,
+                flipH: img.flipH,
+                flipV: img.flipV,
+                opacity: img.opacity,
+              }
+            : undefined,
           layers: layers
             .filter((l) => l.text.trim())
             .map((l) => ({
@@ -782,6 +1241,11 @@ export default function Studio() {
               bold: l.bold,
               highlight: l.highlight,
               outline: l.outline,
+              opacity: l.opacity,
+              shadow: l.shadow,
+              lineHeight: l.lineHeight,
+              flipH: l.flipH,
+              flipV: l.flipV,
             })),
         },
         price: Number(variant.price),
@@ -799,7 +1263,7 @@ export default function Studio() {
 
   const cart = useCart();
   const hasDesign = !!cloudUrl || layers.some((l) => l.text.trim());
-  const lightShirt = shirt.hex === '#f2f2f2';
+  const lightShirt = colorDistance(shirt.hex, '#ffffff') < colorDistance(shirt.hex, '#000000');
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
@@ -834,6 +1298,86 @@ export default function Studio() {
             </Pressable>
           </View>
         </View>
+
+        {/* סרגל כלים קטן לתמונה — מופיע כשהתמונה נבחרת */}
+        {imageSelected && localImg && (
+          <View style={st.toolbarWrap}>
+            <View style={st.toolbarRow}>
+              <Pressable
+                style={[st.moreBtn, img.flipH && st.btnActive]}
+                onPress={() => updateImg({ flipH: !img.flipH })}
+              >
+                <Text style={[st.moreBtnText, img.flipH && st.textActive]}>⇋ אופקי</Text>
+              </Pressable>
+              <Pressable
+                style={[st.moreBtn, img.flipV && st.btnActive]}
+                onPress={() => updateImg({ flipV: !img.flipV })}
+              >
+                <Text style={[st.moreBtnText, img.flipV && st.textActive]}>⇵ אנכי</Text>
+              </Pressable>
+              <Pressable
+                style={[st.moreBtn, img.locked && st.btnActive]}
+                onPress={() => updateImg({ locked: !img.locked })}
+              >
+                <Text style={[st.moreBtnText, img.locked && st.textActive]}>🔒 נעילה</Text>
+              </Pressable>
+              <View style={st.stepperGroup}>
+                <Pressable style={st.stepBtn} onPress={() => updateImg({ rotation: clamp(img.rotation - 5, -45, 45) })}>
+                  <Text style={st.stepBtnText}>−</Text>
+                </Pressable>
+                <Text style={st.stepValue}>{img.rotation}°</Text>
+                <Pressable style={st.stepBtn} onPress={() => updateImg({ rotation: clamp(img.rotation + 5, -45, 45) })}>
+                  <Text style={st.stepBtnText}>+</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={st.sliderRow}>
+              <Text style={st.sliderValue}>{img.opacity}%</Text>
+              <Slider
+                style={st.slider}
+                inverted={SLIDER_INVERTED}
+                minimumValue={10}
+                maximumValue={100}
+                step={5}
+                value={img.opacity}
+                onSlidingStart={snapshot}
+                onValueChange={(v) => updateImg({ opacity: Math.round(v) }, false)}
+                minimumTrackTintColor={C.accent}
+                maximumTrackTintColor={C.border}
+                thumbTintColor={C.accent}
+              />
+              <Text style={st.sliderLabel}>שקיפות</Text>
+            </View>
+
+            <Text style={st.subLabel}>יישור התמונה</Text>
+            <View style={st.row}>
+              <Pressable style={st.alignQuickBtn} onPress={() => { updateImg({ x: AREA_W / 2, y: AREA_H / 2 }); }}>
+                <Text style={st.alignQuickText}>⌖ מרכוז מהיר</Text>
+              </Pressable>
+            </View>
+            <View style={st.row}>
+              <Pressable style={st.toolIconBtn} onPress={() => alignImage('right')}>
+                <Text style={st.toolIconGlyph}>⇥|</Text>
+              </Pressable>
+              <Pressable style={st.toolIconBtn} onPress={() => alignImage('centerX')}>
+                <Text style={st.toolIconGlyph}>|↔|</Text>
+              </Pressable>
+              <Pressable style={st.toolIconBtn} onPress={() => alignImage('left')}>
+                <Text style={st.toolIconGlyph}>|⇤</Text>
+              </Pressable>
+              <Pressable style={st.toolIconBtn} onPress={() => alignImage('top')}>
+                <Text style={st.toolIconGlyph}>⤒</Text>
+              </Pressable>
+              <Pressable style={st.toolIconBtn} onPress={() => alignImage('centerY')}>
+                <Text style={st.toolIconGlyph}>↕</Text>
+              </Pressable>
+              <Pressable style={st.toolIconBtn} onPress={() => alignImage('bottom')}>
+                <Text style={st.toolIconGlyph}>⤓</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
 
         {/* סרגל כלים קטן — כמו בקנבה, מופיע רק כשטקסט נבחר */}
         {selected && (
@@ -945,7 +1489,124 @@ export default function Studio() {
               >
                 <Text style={[st.toolIconGlyph, selected.outline && st.textActive]}>◎</Text>
               </Pressable>
+
+              <Pressable
+                style={[st.toolIconBtn, openPanel === 'align' && st.btnActive]}
+                onPress={() => setOpenPanel((p) => (p === 'align' ? null : 'align'))}
+              >
+                <Text style={st.toolIconGlyph}>⌖</Text>
+              </Pressable>
+
+              <Pressable
+                style={[st.toolIconBtn, openPanel === 'more' && st.btnActive]}
+                onPress={() => setOpenPanel((p) => (p === 'more' ? null : 'more'))}
+              >
+                <Text style={st.toolIconGlyph}>⋯</Text>
+              </Pressable>
             </ScrollView>
+
+            {openPanel === 'align' && (
+              <View style={st.alignPanel}>
+                <Pressable style={st.alignQuickBtn} onPress={centerLayerOnShirt}>
+                  <Text style={st.alignQuickText}>⌖ מרכוז מהיר</Text>
+                </Pressable>
+                <View style={st.row}>
+                  <Pressable style={st.toolIconBtn} onPress={() => alignLayer('right')}>
+                    <Text style={st.toolIconGlyph}>⇥|</Text>
+                  </Pressable>
+                  <Pressable style={st.toolIconBtn} onPress={() => alignLayer('centerX')}>
+                    <Text style={st.toolIconGlyph}>|↔|</Text>
+                  </Pressable>
+                  <Pressable style={st.toolIconBtn} onPress={() => alignLayer('left')}>
+                    <Text style={st.toolIconGlyph}>|⇤</Text>
+                  </Pressable>
+                  <Pressable style={st.toolIconBtn} onPress={() => alignLayer('top')}>
+                    <Text style={st.toolIconGlyph}>⤒</Text>
+                  </Pressable>
+                  <Pressable style={st.toolIconBtn} onPress={() => alignLayer('centerY')}>
+                    <Text style={st.toolIconGlyph}>↕</Text>
+                  </Pressable>
+                  <Pressable style={st.toolIconBtn} onPress={() => alignLayer('bottom')}>
+                    <Text style={st.toolIconGlyph}>⤓</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            {openPanel === 'more' && (
+              <View style={st.morePanel}>
+                <View style={st.row}>
+                  <Pressable
+                    style={[st.moreBtn, selected.shadow && st.btnActive]}
+                    onPress={() => updateSelected({ shadow: !selected.shadow })}
+                  >
+                    <Text style={[st.moreBtnText, selected.shadow && st.textActive]}>🌑 צל</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[st.moreBtn, selected.locked && st.btnActive]}
+                    onPress={() => updateSelected({ locked: !selected.locked })}
+                  >
+                    <Text style={[st.moreBtnText, selected.locked && st.textActive]}>🔒 נעילה</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[st.moreBtn, selected.flipH && st.btnActive]}
+                    onPress={() => updateSelected({ flipH: !selected.flipH })}
+                  >
+                    <Text style={[st.moreBtnText, selected.flipH && st.textActive]}>⇋ אופקי</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[st.moreBtn, selected.flipV && st.btnActive]}
+                    onPress={() => updateSelected({ flipV: !selected.flipV })}
+                  >
+                    <Text style={[st.moreBtnText, selected.flipV && st.textActive]}>⇵ אנכי</Text>
+                  </Pressable>
+                </View>
+
+                <View style={st.sliderRow}>
+                  <Text style={st.sliderValue}>{selected.opacity}%</Text>
+                  <Slider
+                    style={st.slider}
+                    inverted={SLIDER_INVERTED}
+                    minimumValue={10}
+                    maximumValue={100}
+                    step={5}
+                    value={selected.opacity}
+                    onSlidingStart={snapshot}
+                    onValueChange={(v) => updateSelected({ opacity: Math.round(v) }, false)}
+                    minimumTrackTintColor={C.accent}
+                    maximumTrackTintColor={C.border}
+                    thumbTintColor={C.accent}
+                  />
+                  <Text style={st.sliderLabel}>שקיפות</Text>
+                </View>
+
+                <View style={st.stepperGroup}>
+                  <Pressable
+                    style={st.stepBtn}
+                    onPress={() => updateSelected({ lineHeight: clamp(Math.round((selected.lineHeight - 0.1) * 10) / 10, 1, 2) })}
+                  >
+                    <Text style={st.stepBtnText}>−</Text>
+                  </Pressable>
+                  <Text style={st.stepValue}>{selected.lineHeight.toFixed(1)}</Text>
+                  <Pressable
+                    style={st.stepBtn}
+                    onPress={() => updateSelected({ lineHeight: clamp(Math.round((selected.lineHeight + 0.1) * 10) / 10, 1, 2) })}
+                  >
+                    <Text style={st.stepBtnText}>+</Text>
+                  </Pressable>
+                  <Text style={st.stepGroupLabel}>מרווח שורות</Text>
+                </View>
+
+                <View style={st.row}>
+                  <Pressable style={st.zOrderBtn} onPress={sendToBack}>
+                    <Text style={st.zOrderText}>⬇ שלח אחורה</Text>
+                  </Pressable>
+                  <Pressable style={st.zOrderBtn} onPress={bringToFront}>
+                    <Text style={st.zOrderText}>⬆ הבא לפנים</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
 
             {openPanel === 'font' && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.fontRow}>
@@ -1070,7 +1731,24 @@ export default function Studio() {
         {/* תצוגה מקדימה */}
         <View style={[st.shirtPreview, { backgroundColor: shirt.hex }]}>
           <View style={[st.printArea, { borderColor: lightShirt ? '#00000022' : '#ffffff22' }]}>
-            {localImg && <Image source={{ uri: localImg }} style={st.printImg} contentFit="contain" />}
+            {localImg && (
+              <DraggableImage
+                uri={localImg}
+                img={img}
+                selected={imageSelected}
+                onSelect={() => {
+                  setImageSelected(true);
+                  setSelectedId(null);
+                }}
+                onDragStart={() => {
+                  snapshot();
+                  setScrollLocked(true);
+                }}
+                onDragEnd={() => setScrollLocked(false)}
+                onMove={(x, y) => setImg((prev) => ({ ...prev, x, y }))}
+                onResize={(patch) => setImg((prev) => ({ ...prev, ...patch }))}
+              />
+            )}
             {!localImg && layers.length === 0 && (
               <Text style={[st.printHint, { color: lightShirt ? '#00000066' : '#ffffff66' }]}>
                 אזור ההדפסה
@@ -1081,7 +1759,10 @@ export default function Studio() {
                 key={l.id}
                 layer={l}
                 selected={l.id === selectedId}
-                onSelect={() => setSelectedId(l.id)}
+                onSelect={() => {
+                  setSelectedId(l.id);
+                  setImageSelected(false);
+                }}
                 onDragStart={() => {
                   snapshot();
                   setScrollLocked(true);
@@ -1089,6 +1770,9 @@ export default function Studio() {
                 onDragEnd={() => setScrollLocked(false)}
                 onMove={(x, y) => setLayers((ls) => ls.map((li) => (li.id === l.id ? { ...li, x, y } : li)))}
                 onResize={(patch) => setLayers((ls) => ls.map((li) => (li.id === l.id ? { ...li, ...patch } : li)))}
+                onMeasured={(w, h) => {
+                  layerSizeRef.current[l.id] = { w, h };
+                }}
               />
             ))}
           </View>
@@ -1110,6 +1794,35 @@ export default function Studio() {
         {layers.length > 0 && <Text style={st.dragHint}>גררו את הטקסט למיקום הרצוי · הקישו לבחירה</Text>}
         {cloudUrl && !uploading && <Text style={st.okText}>✓ העיצוב נשמר בענן</Text>}
 
+        {/* עצת איכות הדפסה — הערכה כללית, לא מפרט הדפסה רשמי */}
+        {(naturalImgSize || layers.length > 0) && (
+          <View style={st.adviceBox}>
+            <Text style={st.adviceTitle}>בדיקת איכות מהירה</Text>
+            {naturalImgSize && Math.min(naturalImgSize.w, naturalImgSize.h) < 1000 && (
+              <Text style={st.adviceLine}>⚠️ רזולוציית התמונה נמוכה יחסית — ההדפסה עלולה לצאת מטושטשת</Text>
+            )}
+            {naturalImgSize && img.w / AREA_W < 0.25 && (
+              <Text style={st.adviceLine}>⚠️ התמונה קטנה על החולצה — כדאי להגדיל להדפסה בולטת יותר</Text>
+            )}
+            {hasTransparency && (
+              <Text style={st.adviceLine}>ℹ️ לעיצוב יש רקע שקוף — ודאו שזה מתאים לצבע החולצה שבחרתם</Text>
+            )}
+            {layers
+              .filter((l) => l.text.trim() && colorDistance(l.color, shirt.hex) < 60)
+              .map((l) => (
+                <Text key={l.id} style={st.adviceLine}>
+                  ⚠️ הטקסט "{l.text.trim().slice(0, 12)}" קרוב בצבעו לצבע החולצה — עלול לא לבלוט
+                </Text>
+              ))}
+            {!layers.some((l) => l.text.trim() && colorDistance(l.color, shirt.hex) < 60) &&
+              !hasTransparency &&
+              !(naturalImgSize && (Math.min(naturalImgSize.w, naturalImgSize.h) < 1000 || img.w / AREA_W < 0.25)) && (
+                <Text style={st.adviceLineOk}>✓ נראה תקין להדפסה</Text>
+              )}
+            <Text style={st.adviceFooter}>הערכה כללית בלבד — לא תחליף לבדיקת דפוס מקצועית</Text>
+          </View>
+        )}
+
         <View style={st.rowSpread}>
           {selected && (
             <Pressable style={st.deleteBtn} onPress={removeSelected}>
@@ -1123,16 +1836,6 @@ export default function Studio() {
             <Text style={st.addTextBtnText}>+ הוספת טקסט</Text>
           </Pressable>
         </View>
-
-        {/* סמלים מהירים */}
-        <Text style={st.subLabel}>סמלים מהירים</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.fontRow}>
-          {SYMBOLS.map((sym) => (
-            <Pressable key={sym} style={st.symbolBtn} onPress={() => addSymbol(sym)}>
-              <Text style={st.symbolText}>{sym}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
 
 
         {cloudUrl && !uploading && (
@@ -1176,6 +1879,71 @@ export default function Studio() {
           ))}
         </View>
         <Text style={st.hint}>{shirt.name}</Text>
+
+        <Pressable
+          style={[st.outlineBtn, shirtCustomOpen && st.btnActive]}
+          onPress={() => setShirtCustomOpen((v) => !v)}
+        >
+          <Text style={[st.sizeText, shirtCustomOpen && st.textActive]}>🎨 כל צבע — בורר חופשי</Text>
+        </Pressable>
+        {shirtCustomOpen && (
+          <View style={st.customBox}>
+            <View style={st.customHeader}>
+              <View style={[st.customSwatch, { backgroundColor: hslToHex(shirtHue, shirtSat, shirtLight) }]} />
+              <Pressable
+                style={st.applyBtn}
+                onPress={() => setShirt({ name: 'מותאם אישית', hex: hslToHex(shirtHue, shirtSat, shirtLight) })}
+              >
+                <Text style={st.applyText}>החלת הצבע</Text>
+              </Pressable>
+            </View>
+            <View style={st.sliderRow}>
+              <Slider
+                style={st.slider}
+                inverted={SLIDER_INVERTED}
+                minimumValue={0}
+                maximumValue={360}
+                step={1}
+                value={shirtHue}
+                onValueChange={(v) => setShirtHue(Math.round(v))}
+                minimumTrackTintColor={hslToHex(shirtHue, 100, 50)}
+                maximumTrackTintColor={C.border}
+                thumbTintColor={hslToHex(shirtHue, 100, 50)}
+              />
+              <Text style={st.sliderLabel}>גוון</Text>
+            </View>
+            <View style={st.sliderRow}>
+              <Slider
+                style={st.slider}
+                inverted={SLIDER_INVERTED}
+                minimumValue={0}
+                maximumValue={100}
+                step={1}
+                value={shirtSat}
+                onValueChange={(v) => setShirtSat(Math.round(v))}
+                minimumTrackTintColor={C.accent}
+                maximumTrackTintColor={C.border}
+                thumbTintColor={C.accent}
+              />
+              <Text style={st.sliderLabel}>עוצמה</Text>
+            </View>
+            <View style={st.sliderRow}>
+              <Slider
+                style={st.slider}
+                inverted={SLIDER_INVERTED}
+                minimumValue={5}
+                maximumValue={95}
+                step={1}
+                value={shirtLight}
+                onValueChange={(v) => setShirtLight(Math.round(v))}
+                minimumTrackTintColor={C.accent}
+                maximumTrackTintColor={C.border}
+                thumbTintColor={C.accent}
+              />
+              <Text style={st.sliderLabel}>בהירות</Text>
+            </View>
+          </View>
+        )}
 
         <Text style={st.label}>מידה</Text>
         <View style={st.row}>
@@ -1222,7 +1990,25 @@ export default function Studio() {
           <View style={[st.zoomShirt, { backgroundColor: shirt.hex }]}>
             <View style={{ transform: [{ scale: 1.45 }] }}>
               <View style={[st.printArea, { borderColor: 'transparent' }]}>
-                {localImg && <Image source={{ uri: localImg }} style={st.printImg} contentFit="contain" />}
+                {localImg && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      left: img.x - img.w / 2,
+                      top: img.y - img.h / 2,
+                      width: img.w,
+                      height: img.h,
+                      opacity: img.opacity / 100,
+                      transform: [
+                        { rotate: `${img.rotation}deg` },
+                        { scaleX: img.flipH ? -1 : 1 },
+                        { scaleY: img.flipV ? -1 : 1 },
+                      ],
+                    }}
+                  >
+                    <Image source={{ uri: localImg }} style={st.printImg} contentFit="contain" />
+                  </View>
+                )}
                 {layers.map((l) => (
                   <View
                     key={l.id}
@@ -1232,10 +2018,13 @@ export default function Studio() {
                       {
                         left: l.x,
                         top: l.y,
+                        opacity: l.opacity / 100,
                         transform: [
                           { translateX: '-50%' as never },
                           { translateY: '-50%' as never },
                           { rotate: `${l.rotation}deg` },
+                          { scaleX: l.flipH ? -1 : 1 },
+                          { scaleY: l.flipV ? -1 : 1 },
                         ],
                       },
                     ]}
@@ -1246,6 +2035,7 @@ export default function Studio() {
                           fontFamily: l.font.family,
                           color: l.color,
                           fontSize: l.size,
+                          lineHeight: Math.round(l.size * l.lineHeight),
                           textAlign: l.align,
                           letterSpacing: l.spacing,
                           fontWeight: l.bold ? '700' : 'normal',
@@ -1256,11 +2046,15 @@ export default function Studio() {
                           paddingVertical: 2,
                           borderRadius: 3,
                         },
-                        l.outline && {
-                          textShadowColor: l.color === '#000000' ? '#ffffff' : '#000000',
-                          textShadowRadius: 3,
-                          textShadowOffset: { width: 0, height: 0 },
-                        },
+                        l.outline
+                          ? {
+                              textShadowColor: l.color === '#000000' ? '#ffffff' : '#000000',
+                              textShadowRadius: 3,
+                              textShadowOffset: { width: 0, height: 0 },
+                            }
+                          : l.shadow
+                            ? { textShadowColor: '#00000099', textShadowRadius: 4, textShadowOffset: { width: 2, height: 3 } }
+                            : null,
                       ]}
                       numberOfLines={l.width != null ? undefined : 3}
                     >
@@ -1401,6 +2195,27 @@ const st = StyleSheet.create({
   printHint: { fontSize: 14, fontWeight: '600' },
   layerWrap: { position: 'absolute', padding: 4, maxWidth: AREA_W - 8 },
   layerSelected: { borderWidth: 1, borderColor: C.accent, borderStyle: 'dashed', borderRadius: 4 },
+  imgSelectedBorder: {
+    ...(StyleSheet.absoluteFill as object),
+    borderWidth: 1,
+    borderColor: C.accent,
+    borderStyle: 'dashed',
+    borderRadius: 4,
+  },
+  lockBadge: {
+    position: 'absolute',
+    top: -20,
+    right: -4,
+    width: 22,
+    height: 22,
+    borderRadius: R.full,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockBadgeText: { fontSize: 11 },
   dragHint: { color: C.textDim, fontSize: 12, textAlign: 'center', marginTop: 6 },
   zoomBtn: {
     position: 'absolute',
@@ -1561,6 +2376,18 @@ const st = StyleSheet.create({
   },
   uploadText: { color: C.text, fontSize: 15, fontWeight: '600' },
   okText: { color: C.accent, fontSize: 13, fontWeight: '700', marginTop: 6, textAlign: 'center' },
+  adviceBox: {
+    marginTop: S.sm,
+    backgroundColor: C.surface,
+    borderRadius: R.md,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: S.sm,
+  },
+  adviceTitle: { color: C.text, fontSize: 13, fontWeight: '800', textAlign: 'right', marginBottom: 4 },
+  adviceLine: { color: '#ffd166', fontSize: 12, textAlign: 'right', marginTop: 3 },
+  adviceLineOk: { color: C.accent, fontSize: 12, textAlign: 'right', marginTop: 3 },
+  adviceFooter: { color: C.textDim, fontSize: 10, textAlign: 'right', marginTop: 6 },
   rowSpread: { flexDirection: 'row', justifyContent: 'flex-end', gap: S.sm, marginTop: S.md },
   addTextBtn: { backgroundColor: C.accent, borderRadius: R.full, paddingVertical: 11, paddingHorizontal: 20 },
   addTextBtnText: { color: C.onAccent, fontSize: 15, fontWeight: '800' },
@@ -1643,6 +2470,36 @@ const st = StyleSheet.create({
   stepBtn: { paddingVertical: 8, paddingHorizontal: 10 },
   stepBtnText: { color: C.accent, fontSize: 16, fontWeight: '800' },
   stepValue: { color: C.text, fontSize: 13, fontWeight: '700', minWidth: 30, textAlign: 'center' },
+  stepGroupLabel: { color: C.textDim, fontSize: 12, fontWeight: '700', marginRight: S.sm },
+  alignPanel: { marginTop: S.sm, gap: S.sm },
+  alignQuickBtn: {
+    alignSelf: 'flex-end',
+    backgroundColor: C.accent,
+    borderRadius: R.full,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  alignQuickText: { color: C.onAccent, fontSize: 13, fontWeight: '800' },
+  morePanel: { marginTop: S.sm, gap: S.md },
+  moreBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: R.sm,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  moreBtnText: { color: C.textDim, fontSize: 13, fontWeight: '700' },
+  zOrderBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: R.sm,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+  },
+  zOrderText: { color: C.text, fontSize: 13, fontWeight: '700' },
   boldText: { color: C.textDim, fontSize: 17, fontWeight: '900' },
   label: {
     color: C.text,
