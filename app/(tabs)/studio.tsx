@@ -383,19 +383,21 @@ function DraggableText({
           const isCorner = kind.length === 2;
           const isVerticalBar = kind === 'w' || kind === 'e';
           const shape = isCorner ? st.handleCorner : isVerticalBar ? st.handleBarV : st.handleBarH;
+          // בלי transform למרכוז — ב-RN באנדרואיד אזור המגע לא תמיד עוקב אחרי transform,
+          // אז ממקמים בחישוב ישיר (הפינה השמאלית-עליונה של אזור המגע) כדי שהמגע יתאים בדיוק למה שרואים
+          const HIT = 22;
           return (
             <View
               key={kind}
               {...(Platform.OS === 'web'
                 ? webHandleHandlers(kind, layerRef, measuredRef, onResize, onDragStart, onDragEnd)
                 : handlePanByKind[kind].panHandlers)}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={[
                 st.resizeHandleHit,
                 {
-                  left: (leftPct / 100) * measured.w,
-                  top: (topPct / 100) * measured.h,
-                  transform: [{ translateX: '-50%' as never }, { translateY: '-50%' as never }],
+                  left: (leftPct / 100) * measured.w - HIT / 2,
+                  top: (topPct / 100) * measured.h - HIT / 2,
                 },
               ]}
             >
