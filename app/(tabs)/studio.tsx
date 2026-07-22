@@ -1177,6 +1177,10 @@ export default function Studio() {
   // השראה מהחנות + זום
   const [inspiration, setInspiration] = useState<Product[]>([]);
   const [scrollLocked, setScrollLocked] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [hue, setHue] = useState(120);
+  const [sat, setSat] = useState(100);
+  const [light, setLight] = useState(50);
   const [openPanel, setOpenPanel] = useState<null | 'font' | 'color' | 'highlight' | 'more' | 'align'>(null);
   const [copiedStyle, setCopiedStyle] = useState<Partial<Layer> | null>(null);
   const fontScrollRef = useRef<ScrollView>(null);
@@ -1960,6 +1964,70 @@ export default function Studio() {
                     </View>
                   ))}
                 </ScrollView>
+                <Pressable
+                  style={[st.outlineBtn, customOpen && st.btnActive]}
+                  onPress={() => setCustomOpen((v) => !v)}
+                >
+                  <Text style={[st.sizeText, customOpen && st.textActive]}>🎨 כל צבע — בורר חופשי</Text>
+                </Pressable>
+                {customOpen && (
+                  <View style={st.customBox}>
+                    <View style={st.customHeader}>
+                      <View style={[st.customSwatch, { backgroundColor: hslToHex(hue, sat, light) }]} />
+                      <Pressable
+                        style={st.applyBtn}
+                        onPress={() => updateSelected({ color: hslToHex(hue, sat, light) })}
+                      >
+                        <Text style={st.applyText}>החלת הצבע</Text>
+                      </Pressable>
+                    </View>
+                    <View style={st.sliderRow}>
+                      <Slider
+                        style={st.slider}
+                        inverted={SLIDER_INVERTED}
+                        minimumValue={0}
+                        maximumValue={360}
+                        step={1}
+                        value={hue}
+                        onValueChange={(v) => setHue(Math.round(v))}
+                        minimumTrackTintColor={hslToHex(hue, 100, 50)}
+                        maximumTrackTintColor={C.border}
+                        thumbTintColor={hslToHex(hue, 100, 50)}
+                      />
+                      <Text style={st.sliderLabel}>גוון</Text>
+                    </View>
+                    <View style={st.sliderRow}>
+                      <Slider
+                        style={st.slider}
+                        inverted={SLIDER_INVERTED}
+                        minimumValue={0}
+                        maximumValue={100}
+                        step={1}
+                        value={sat}
+                        onValueChange={(v) => setSat(Math.round(v))}
+                        minimumTrackTintColor={C.accent}
+                        maximumTrackTintColor={C.border}
+                        thumbTintColor={C.accent}
+                      />
+                      <Text style={st.sliderLabel}>עוצמה</Text>
+                    </View>
+                    <View style={st.sliderRow}>
+                      <Slider
+                        style={st.slider}
+                        inverted={SLIDER_INVERTED}
+                        minimumValue={5}
+                        maximumValue={95}
+                        step={1}
+                        value={light}
+                        onValueChange={(v) => setLight(Math.round(v))}
+                        minimumTrackTintColor={C.accent}
+                        maximumTrackTintColor={C.border}
+                        thumbTintColor={C.accent}
+                      />
+                      <Text style={st.sliderLabel}>בהירות</Text>
+                    </View>
+                  </View>
+                )}
               </View>
             )}
 
