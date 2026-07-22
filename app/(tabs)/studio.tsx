@@ -34,7 +34,7 @@ const SHIRT_COLORS = [
 const SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL'];
 
 const FONTS = [
-  { name: 'חיבו', family: 'Heebo' },
+  { name: 'היבו', family: 'Heebo' },
   { name: 'אסיסטנט', family: 'Assistant' },
   { name: 'רוביק', family: 'Rubik' },
   { name: 'ורלה', family: 'VarelaRound' },
