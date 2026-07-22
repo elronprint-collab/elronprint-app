@@ -1183,6 +1183,8 @@ export default function Studio() {
   const [light, setLight] = useState(50);
   const [openPanel, setOpenPanel] = useState<null | 'font' | 'color' | 'highlight' | 'more' | 'align'>(null);
   const [copiedStyle, setCopiedStyle] = useState<Partial<Layer> | null>(null);
+  const fontScrollRef = useRef<ScrollView>(null);
+  const fontScrollX = useRef(0);
   const [imgPanel, setImgPanel] = useState<null | 'crop' | 'border'>(null);
   const BORDER_STYLES: { key: BorderStyle; label: string }[] = [
     { key: 'none', label: '⊘' },
@@ -1907,7 +1909,26 @@ export default function Studio() {
             )}
 
             {openPanel === 'font' && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.fontRow}>
+              <ScrollView
+                ref={fontScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={st.fontRow}
+                onScroll={(e) => {
+                  fontScrollX.current = e.nativeEvent.contentOffset.x;
+                }}
+                scrollEventThrottle={16}
+                {...(Platform.OS === 'web'
+                  ? {
+                      onWheel: (e: any) => {
+                        e.preventDefault();
+                        const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+                        const next = Math.max(0, fontScrollX.current + delta);
+                        fontScrollRef.current?.scrollTo({ x: next, animated: false });
+                      },
+                    }
+                  : {})}
+              >
                 {FONTS.map((f) => (
                   <Pressable
                     key={f.family}
