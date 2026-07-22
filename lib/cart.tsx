@@ -6,6 +6,7 @@ export type DesignLayer = {
   fontFamily: string;
   color: string;
   size: number;
+  width?: number;
   x: number;
   y: number;
   rotation: number;

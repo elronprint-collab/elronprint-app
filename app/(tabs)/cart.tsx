@@ -31,6 +31,7 @@ function MiniPreview({ design }: { design: CartDesign }) {
               position: 'absolute',
               left: l.x * MINI,
               top: l.y * MINI,
+              width: l.width != null ? l.width * MINI : undefined,
               transform: [
                 { translateX: '-50%' as never },
                 { translateY: '-50%' as never },

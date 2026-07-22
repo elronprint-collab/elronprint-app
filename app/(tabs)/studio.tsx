@@ -100,7 +100,71 @@ type Layer = {
   align: 'right' | 'center' | 'left';
   highlight: string | null;
   spacing: number;
+  width?: number; // רוחב מפורש של תיבת הטקסט — נקבע כשגוררים ידית צד/פינה
 };
+
+type HandleKind = 'nw' | 'n' | 'ne' | 'w' | 'e' | 'sw' | 's' | 'se';
+
+const HANDLES: { kind: HandleKind; leftPct: number; topPct: number; glyph: string }[] = [
+  { kind: 'nw', leftPct: 0, topPct: 0, glyph: '⤡' },
+  { kind: 'n', leftPct: 50, topPct: 0, glyph: '↕' },
+  { kind: 'ne', leftPct: 100, topPct: 0, glyph: '⤢' },
+  { kind: 'w', leftPct: 0, topPct: 50, glyph: '↔' },
+  { kind: 'e', leftPct: 100, topPct: 50, glyph: '↔' },
+  { kind: 'sw', leftPct: 0, topPct: 100, glyph: '⤢' },
+  { kind: 's', leftPct: 50, topPct: 100, glyph: '↕' },
+  { kind: 'se', leftPct: 100, topPct: 100, glyph: '⤡' },
+];
+
+const MIN_TEXT_SIZE = 12;
+const MAX_TEXT_SIZE = 96;
+const MIN_BOX_WIDTH = 40;
+const MAX_BOX_WIDTH = AREA_W - 16;
+
+function clamp(v: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, v));
+}
+
+// מחשב את השינוי בגודל/רוחב/מיקום לפי כיוון הידית שנגררת
+function computeResizePatch(
+  kind: HandleKind,
+  dx: number,
+  dy: number,
+  base: { size: number; width: number; x: number },
+): Partial<Layer> {
+  switch (kind) {
+    case 'se': {
+      const diag = (dx + dy) / 2;
+      return { size: clamp(Math.round(base.size + diag * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE), width: clamp(Math.round(base.width + diag), MIN_BOX_WIDTH, MAX_BOX_WIDTH) };
+    }
+    case 'sw': {
+      const diag = (-dx + dy) / 2;
+      return { size: clamp(Math.round(base.size + diag * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE), width: clamp(Math.round(base.width + diag), MIN_BOX_WIDTH, MAX_BOX_WIDTH) };
+    }
+    case 'ne': {
+      const diag = (dx - dy) / 2;
+      return { size: clamp(Math.round(base.size + diag * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE), width: clamp(Math.round(base.width + diag), MIN_BOX_WIDTH, MAX_BOX_WIDTH) };
+    }
+    case 'nw': {
+      const diag = (-dx - dy) / 2;
+      return { size: clamp(Math.round(base.size + diag * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE), width: clamp(Math.round(base.width + diag), MIN_BOX_WIDTH, MAX_BOX_WIDTH) };
+    }
+    case 'e':
+      return {
+        width: clamp(Math.round(base.width + dx), MIN_BOX_WIDTH, MAX_BOX_WIDTH),
+        x: Math.round(base.x + dx / 2),
+      };
+    case 'w':
+      return {
+        width: clamp(Math.round(base.width - dx), MIN_BOX_WIDTH, MAX_BOX_WIDTH),
+        x: Math.round(base.x + dx / 2),
+      };
+    case 's':
+      return { size: clamp(Math.round(base.size + dy * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE) };
+    case 'n':
+      return { size: clamp(Math.round(base.size - dy * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE) };
+  }
+}
 
 let nextId = 1;
 
@@ -122,10 +186,12 @@ function newLayer(): Layer {
   };
 }
 
-// גרירת עכבר לידית ההגדלה — נדרש רק בדפדפן מחשב (PanResponder של רקטיב-נייטיב מיועד למגע)
-function webResizeHandlers(
+// גרירת עכבר לידיות ההגדלה — נדרש רק בדפדפן מחשב (PanResponder של רקטיב-נייטיב מיועד למגע)
+function webHandleHandlers(
+  kind: HandleKind,
   layerRef: MutableRefObject<Layer>,
-  onResize: (size: number) => void,
+  measuredRef: MutableRefObject<{ w: number; h: number }>,
+  onResize: (patch: Partial<Layer>) => void,
   onDragStart: () => void,
   onDragEnd: () => void,
 ) {
@@ -133,14 +199,16 @@ function webResizeHandlers(
     onMouseDown: (e: any) => {
       e.preventDefault?.();
       e.stopPropagation?.();
-      const startSize = layerRef.current.size;
+      const base = {
+        size: layerRef.current.size,
+        width: layerRef.current.width ?? measuredRef.current.w,
+        x: layerRef.current.x,
+      };
       const startX = e.clientX;
       const startY = e.clientY;
       onDragStart();
       const onMove = (ev: MouseEvent) => {
-        const delta = (ev.clientY - startY + -(ev.clientX - startX)) / 2;
-        const next = Math.min(96, Math.max(12, Math.round(startSize + delta * 0.7)));
-        onResize(next);
+        onResize(computeResizePatch(kind, ev.clientX - startX, ev.clientY - startY, base));
       };
       const onUp = () => {
         window.removeEventListener('mousemove', onMove);
@@ -151,6 +219,40 @@ function webResizeHandlers(
       window.addEventListener('mouseup', onUp);
     },
   };
+}
+
+function useHandleResponder(
+  kind: HandleKind,
+  layerRef: MutableRefObject<Layer>,
+  measuredRef: MutableRefObject<{ w: number; h: number }>,
+  onResize: (patch: Partial<Layer>) => void,
+  onDragStart: () => void,
+  onDragEnd: () => void,
+) {
+  const base = useRef({ size: 0, width: 0, x: 0 });
+  return useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
+      onPanResponderGrant: () => {
+        base.current = {
+          size: layerRef.current.size,
+          width: layerRef.current.width ?? measuredRef.current.w,
+          x: layerRef.current.x,
+        };
+        onDragStart();
+      },
+      onPanResponderMove: (_e, g) => {
+        onResize(computeResizePatch(kind, g.dx, g.dy, base.current));
+      },
+      onPanResponderRelease: onDragEnd,
+      onPanResponderTerminate: onDragEnd,
+    }),
+  ).current;
 }
 
 function DraggableText({
@@ -166,14 +268,15 @@ function DraggableText({
   selected: boolean;
   onSelect: () => void;
   onMove: (x: number, y: number) => void;
-  onResize: (size: number) => void;
+  onResize: (patch: Partial<Layer>) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
   const start = useRef({ x: layer.x, y: layer.y });
-  const startSize = useRef(layer.size);
   const layerRef = useRef(layer);
   layerRef.current = layer;
+  const measuredRef = useRef({ w: 100, h: 30 });
+
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -194,27 +297,25 @@ function DraggableText({
     }),
   ).current;
 
-  const resizePan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onStartShouldSetPanResponderCapture: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponderCapture: () => true,
-      onPanResponderTerminationRequest: () => false,
-      onShouldBlockNativeResponder: () => true,
-      onPanResponderGrant: () => {
-        startSize.current = layerRef.current.size;
-        onDragStart();
-      },
-      onPanResponderMove: (_e, g) => {
-        const delta = (g.dy + -g.dx) / 2; // אלכסונית: למטה-שמאלה מגדיל
-        const next = Math.min(96, Math.max(12, Math.round(startSize.current + delta * 0.7)));
-        onResize(next);
-      },
-      onPanResponderRelease: onDragEnd,
-      onPanResponderTerminate: onDragEnd,
-    }),
-  ).current;
+  // 8 ידיות מתיחה — פינות ("nw","ne","sw","se") ואמצע-צלעות ("n","s","e","w")
+  const panNW = useHandleResponder('nw', layerRef, measuredRef, onResize, onDragStart, onDragEnd);
+  const panN = useHandleResponder('n', layerRef, measuredRef, onResize, onDragStart, onDragEnd);
+  const panNE = useHandleResponder('ne', layerRef, measuredRef, onResize, onDragStart, onDragEnd);
+  const panW = useHandleResponder('w', layerRef, measuredRef, onResize, onDragStart, onDragEnd);
+  const panE = useHandleResponder('e', layerRef, measuredRef, onResize, onDragStart, onDragEnd);
+  const panSW = useHandleResponder('sw', layerRef, measuredRef, onResize, onDragStart, onDragEnd);
+  const panS = useHandleResponder('s', layerRef, measuredRef, onResize, onDragStart, onDragEnd);
+  const panSE = useHandleResponder('se', layerRef, measuredRef, onResize, onDragStart, onDragEnd);
+  const handlePanByKind: Record<HandleKind, ReturnType<typeof useHandleResponder>> = {
+    nw: panNW,
+    n: panN,
+    ne: panNE,
+    w: panW,
+    e: panE,
+    sw: panSW,
+    s: panS,
+    se: panSE,
+  };
 
   start.current = selected ? start.current : { x: layer.x, y: layer.y };
 
@@ -231,8 +332,12 @@ function DraggableText({
   return (
     <View
       {...pan.panHandlers}
+      onLayout={(e) => {
+        measuredRef.current = { w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height };
+      }}
       style={[
         st.layerWrap,
+        layer.width != null && { width: layer.width },
         {
           left: layer.x,
           top: layer.y,
@@ -263,18 +368,29 @@ function DraggableText({
           },
           shadow,
         ]}
-        numberOfLines={3}
+        numberOfLines={layer.width != null ? undefined : 3}
       >
         {layer.text}
       </Text>
-      {selected && (
-        <View
-          {...(Platform.OS === 'web' ? webResizeHandlers(layerRef, onResize, onDragStart, onDragEnd) : resizePan.panHandlers)}
-          style={st.resizeHandle}
-        >
-          <Text style={st.resizeHandleText}>⤢</Text>
-        </View>
-      )}
+      {selected &&
+        HANDLES.map(({ kind, leftPct, topPct, glyph }) => (
+          <View
+            key={kind}
+            {...(Platform.OS === 'web'
+              ? webHandleHandlers(kind, layerRef, measuredRef, onResize, onDragStart, onDragEnd)
+              : handlePanByKind[kind].panHandlers)}
+            style={[
+              st.resizeHandle,
+              {
+                left: `${leftPct}%` as never,
+                top: `${topPct}%` as never,
+                transform: [{ translateX: '-50%' as never }, { translateY: '-50%' as never }],
+              },
+            ]}
+          >
+            <Text style={st.resizeHandleText}>{glyph}</Text>
+          </View>
+        ))}
     </View>
   );
 }
@@ -470,6 +586,7 @@ export default function Studio() {
             `פונט ${l.font.name}`,
             `צבע ${l.color}`,
             `גודל ${l.size}px`,
+            l.width != null ? `רוחב תיבה ${l.width}px` : '',
             `מיקום ${Math.round((l.x / AREA_W) * 100)}%,${Math.round((l.y / AREA_H) * 100)}%`,
             l.rotation !== 0 ? `סיבוב ${l.rotation}°` : '',
             l.bold ? 'מודגש' : '',
@@ -498,6 +615,7 @@ export default function Studio() {
               fontFamily: l.font.family,
               color: l.color,
               size: l.size,
+              width: l.width,
               x: l.x,
               y: l.y,
               rotation: l.rotation,
@@ -580,7 +698,7 @@ export default function Studio() {
                 }}
                 onDragEnd={() => setScrollLocked(false)}
                 onMove={(x, y) => setLayers((ls) => ls.map((li) => (li.id === l.id ? { ...li, x, y } : li)))}
-                onResize={(sz) => setLayers((ls) => ls.map((li) => (li.id === l.id ? { ...li, size: sz } : li)))}
+                onResize={(patch) => setLayers((ls) => ls.map((li) => (li.id === l.id ? { ...li, ...patch } : li)))}
               />
             ))}
           </View>
@@ -931,6 +1049,7 @@ export default function Studio() {
                     key={l.id}
                     style={[
                       st.layerWrap,
+                      l.width != null && { width: l.width },
                       {
                         left: l.x,
                         top: l.y,
@@ -964,7 +1083,7 @@ export default function Studio() {
                           textShadowOffset: { width: 0, height: 0 },
                         },
                       ]}
-                      numberOfLines={3}
+                      numberOfLines={l.width != null ? undefined : 3}
                     >
                       {l.text}
                     </Text>
@@ -1061,16 +1180,16 @@ const st = StyleSheet.create({
   removeImgText: { color: C.danger, fontSize: 18, fontWeight: '800' },
   resizeHandle: {
     position: 'absolute',
-    bottom: -18,
-    left: -18,
-    width: 38,
-    height: 38,
+    width: 30,
+    height: 30,
     borderRadius: R.full,
     backgroundColor: C.accent,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: C.bg,
   },
-  resizeHandleText: { color: C.onAccent, fontSize: 15, fontWeight: '800' },
+  resizeHandleText: { color: C.onAccent, fontSize: 13, fontWeight: '800' },
   zoomBackdrop: {
     flex: 1,
     backgroundColor: '#000000ee',
