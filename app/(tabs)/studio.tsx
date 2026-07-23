@@ -1461,12 +1461,24 @@ export default function Studio() {
   // בחירת עיצוב מוכן מהגלריה — מפענח את קובץ ה-asset המצורף לאפליקציה לכתובת אמיתית,
   // ואז מעלה אותו ל-Cloudinary בדיוק כמו תמונה שהלקוח מעלה בעצמו, כדי שתהיה לו כתובת cloudUrl
   // תקינה להדפסה
+  // מפענח את מקור התמונה המצורפת (require) לכתובת URI אמיתית — בכל אחת מהצורות
+  // האפשריות בהתאם לפלטפורמה/באנדלר: מחרוזת ישירה, אובייקט עם uri, או מזהה asset מספרי
+  // (רק אז נדרש resolveAssetSource, ורק אם הפונקציה הזו בכלל קיימת בגרסת ה-web הנוכחית —
+  // כאן בדיוק הייתה השגיאה: "resolveAssetSource is not a function")
+  function resolveDesignUri(source: number | string): string | null {
+    if (typeof source === 'string') return source;
+    const asObj = source as unknown as { uri?: string };
+    if (asObj && typeof asObj === 'object' && typeof asObj.uri === 'string') return asObj.uri;
+    if (typeof RNImage.resolveAssetSource === 'function') {
+      const resolved = RNImage.resolveAssetSource(source as number);
+      if (resolved?.uri) return resolved.uri;
+    }
+    return null;
+  }
+
   async function useReadyDesign(design: ReadyDesign) {
     if (uploading) return;
-    // בדפדפן (web), require(תמונה) מחזיר ישירות מחרוזת URL; בנייד זה מחזיר מזהה asset מספרי
-    // שצריך לפענח דרך resolveAssetSource. בלי הבדיקה הזו הלחיצה בדפדפן לא עשתה כלום בשקט.
-    const src: any = design.source;
-    const uri = typeof src === 'string' ? src : RNImage.resolveAssetSource(src)?.uri;
+    const uri = resolveDesignUri(design.source);
     if (!uri) {
       Alert.alert('שגיאה', 'טעינת העיצוב נכשלה, נסו שוב');
       return;
