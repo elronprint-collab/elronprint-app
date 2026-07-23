@@ -22,7 +22,10 @@ export default function ProductScreen() {
   const cart = useCart();
 
   useEffect(() => {
-    if (!handle) return;
+    if (!handle) {
+      setLoading(false);
+      return;
+    }
     fetchProductByHandle(handle)
       .then((p) => {
         setProduct(p);
