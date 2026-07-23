@@ -85,6 +85,35 @@ const PALETTE_GRID: string[][] = [PALETTE_GRAY, ...PALETTE_HUES.map((h) => build
 
 const HIGHLIGHTS: (string | null)[] = [null, '#000000', '#ffffff', '#00fc25', '#ffd400', '#ff3b6b'];
 
+// פריסטים של אפקט גרדיאנט לטקסט (בסגנון METAL/CHROM/80s) — צבעי המעבר להצגה בדפדפן (web),
+// ו-fallbackColor כצבע אחיד לתצוגה במכשיר נייד/אפליקציה, כי גרדיאנט אמיתי על טקסט דורש
+// ספריית מסכה (MaskedView) שעדיין לא מותקנת בפרויקט
+type GradientPreset = { key: string; label: string; colors: string[]; fallbackColor: string };
+const GRADIENT_PRESETS: GradientPreset[] = [
+  { key: 'metal', label: 'מתכת', colors: ['#e8e8e8', '#8c8c8c', '#e8e8e8'], fallbackColor: '#b0b0b0' },
+  { key: 'gold', label: 'זהב', colors: ['#fff6b0', '#d4af37', '#7a5c00'], fallbackColor: '#d4af37' },
+  { key: 'neon', label: 'ניאון', colors: ['#00fff2', '#00ff6a'], fallbackColor: '#00ffae' },
+  { key: 'fire', label: 'אש', colors: ['#fff200', '#ff7a00', '#ff003c'], fallbackColor: '#ff7a00' },
+  { key: 'ice', label: 'קרח', colors: ['#e0faff', '#37a7ff', '#0047ab'], fallbackColor: '#37a7ff' },
+  { key: 'rainbow', label: 'קשת', colors: ['#ff3b6b', '#ffd400', '#00fc25', '#37a7ff', '#a259ff'], fallbackColor: '#a259ff' },
+];
+
+// מחזיר override לסטייל טקסט שמצייר את הגרדיאנט האמיתי — עובד רק בדפדפן (web), כי גרדיאנט אמיתי
+// על טקסט בנייד/אפליקציה דורש ספריית מסכה (MaskedView) שעדיין לא מותקנת בפרויקט.
+// באפליקציה עצמה מוצג במקום זאת הצבע האחיד fallbackColor שכבר נשמר בשדה color של השכבה.
+function gradientWebStyle(gradientKey: string | null): Record<string, any> | null {
+  if (!gradientKey || Platform.OS !== 'web') return null;
+  const preset = GRADIENT_PRESETS.find((g) => g.key === gradientKey);
+  if (!preset) return null;
+  return {
+    backgroundImage: `linear-gradient(90deg, ${preset.colors.join(', ')})`,
+    color: 'transparent',
+    WebkitBackgroundClip: 'text',
+    backgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+  };
+}
+
 type Graphic = { char: string; keywords: string[] };
 type GraphicCategory = { name: string; items: Graphic[] };
 
@@ -273,12 +302,15 @@ const SLIDER_INVERTED = Platform.OS === 'web' ? true : I18nManager.isRTL;
 
 const AREA_W = 230;
 const AREA_H = 280;
+const TEMPLATE_THUMB_W = 110;
+const TEMPLATE_THUMB_H = Math.round((TEMPLATE_THUMB_W * AREA_H) / AREA_W);
 
 type Layer = {
   id: number;
   text: string;
   font: (typeof FONTS)[number];
   color: string;
+  gradient: string | null; // מפתח פריסט מ-GRADIENT_PRESETS, או null לצבע רגיל
   size: number;
   x: number;
   y: number;
@@ -298,6 +330,7 @@ type Layer = {
   lineHeight: number; // מכפיל (1.0-2.0) על גודל הפונט
   flipH: boolean;
   flipV: boolean;
+  hidden: boolean;
 };
 
 type HandleKind = 'nw' | 'n' | 'ne' | 'w' | 'e' | 'sw' | 's' | 'se';
@@ -321,6 +354,7 @@ type ImgTransform = {
   cropScale: number; // 1 = fit to frame, >1 = zoomed in for cropping
   cropOffsetX: number; // px offset of the image inside the crop frame
   cropOffsetY: number;
+  hidden: boolean;
 };
 
 const DEFAULT_IMG: ImgTransform = {
@@ -340,6 +374,7 @@ const DEFAULT_IMG: ImgTransform = {
   cropScale: 1,
   cropOffsetX: 0,
   cropOffsetY: 0,
+  hidden: false,
 };
 
 const HANDLES: { kind: HandleKind; leftPct: number; topPct: number; glyph: string }[] = [
@@ -650,6 +685,7 @@ function newLayer(): Layer {
     text: 'הטקסט שלי',
     font: FONTS[0],
     color: '#ffffff',
+    gradient: null,
     size: 26,
     x: AREA_W / 2,
     y: AREA_H / 2,
@@ -668,8 +704,72 @@ function newLayer(): Layer {
     lineHeight: 1.2,
     flipH: false,
     flipV: false,
+    hidden: false,
   };
 }
+
+// ספריית תבניות מוכנות — כל תבנית היא שילוב מוכן של שכבות טקסט (וגרפיקות, שהן גם שכבות טקסט
+// עם אמוג'י) על בסיס מנגנון השכבות הקיים, בלי צורך בתמונות או ספריות חדשות
+const FONT_BY_FAMILY = (family: string) => FONTS.find((f) => f.family === family) ?? FONTS[0];
+
+type TemplateLayerDef = Partial<Layer> & { text: string };
+type TemplateDef = { id: string; name: string; shirtHex?: string; layers: TemplateLayerDef[] };
+
+const TEMPLATES: TemplateDef[] = [
+  {
+    id: 'summer-sale',
+    name: 'מבצע קיץ',
+    shirtHex: '#1b1b1b',
+    layers: [
+      { text: 'SALE', font: FONT_BY_FAMILY('SuezOne'), color: '#ffd400', size: 60, x: AREA_W / 2, y: AREA_H / 2 - 28, bold: true, rotation: -4 },
+      { text: 'עד 50% הנחה', font: FONT_BY_FAMILY('Heebo'), color: '#ffffff', size: 20, x: AREA_W / 2, y: AREA_H / 2 + 36, bold: true },
+    ],
+  },
+  {
+    id: 'birthday',
+    name: 'יום הולדת',
+    shirtHex: '#f2f2f2',
+    layers: [
+      { text: 'מזל טוב!', font: FONT_BY_FAMILY('VarelaRound'), color: '#ff3b6b', size: 44, x: AREA_W / 2, y: AREA_H / 2 - 20 },
+      { text: '🎉', size: 42, x: AREA_W / 2 - 60, y: AREA_H / 2 - 20, rotation: -10 },
+      { text: '🎂', size: 42, x: AREA_W / 2 + 60, y: AREA_H / 2 - 20, rotation: 10 },
+    ],
+  },
+  {
+    id: 'team',
+    name: 'קבוצה / צוות',
+    shirtHex: '#1b1b1b',
+    layers: [
+      { text: 'TEAM', font: FONT_BY_FAMILY('Karantina'), color: '#37a7ff', size: 56, x: AREA_W / 2, y: AREA_H / 2 - 30, bold: true, outline: true },
+      { text: 'שם הקבוצה', font: FONT_BY_FAMILY('Rubik'), color: '#ffffff', size: 18, x: AREA_W / 2, y: AREA_H / 2 + 34, spacing: 2 },
+    ],
+  },
+  {
+    id: 'minimal',
+    name: 'מינימליסטי',
+    shirtHex: '#f2f2f2',
+    layers: [
+      { text: 'שם / מילה', font: FONT_BY_FAMILY('DavidLibre'), color: '#1b1b1b', size: 30, x: AREA_W / 2, y: AREA_H / 2 },
+    ],
+  },
+  {
+    id: 'retro-neon',
+    name: 'רטרו ניאון',
+    shirtHex: '#1b1b1b',
+    layers: [
+      { text: 'RETRO', font: FONT_BY_FAMILY('SuezOne'), color: '#00fc25', gradient: 'neon', size: 58, x: AREA_W / 2, y: AREA_H / 2, bold: true, shadow: true },
+    ],
+  },
+  {
+    id: 'toast',
+    name: 'לחיים!',
+    shirtHex: '#1b1b1b',
+    layers: [
+      { text: 'לחיים!', font: FONT_BY_FAMILY('FrankRuhl'), color: '#ffd400', gradient: 'gold', size: 46, x: AREA_W / 2, y: AREA_H / 2 - 20 },
+      { text: '🥂', size: 40, x: AREA_W / 2, y: AREA_H / 2 + 34 },
+    ],
+  },
+];
 
 // גרירת עכבר לידיות ההגדלה — נדרש רק בדפדפן מחשב (PanResponder של רקטיב-נייטיב מיועד למגע)
 function webHandleHandlers(
@@ -877,6 +977,7 @@ function DraggableText({
             paddingVertical: 2,
             borderRadius: 3,
           },
+          gradientWebStyle(layer.gradient),
           textShadow,
         ]}
         numberOfLines={layer.width != null ? undefined : 3}
@@ -1089,16 +1190,36 @@ export default function Studio() {
     setSelectedId(copy.id);
   }
 
-  // העתק סגנון (format painter) — מעתיק את מאפייני העיצוב של שכבת הטקסט (לא את התוכן) כדי להדביק על שכבה אחרת
+  // העתק סגנון (format painter) — מעתיק את מאפייני העיצוב של השכבה הנבחרת (טקסט או תמונה) כדי
+  // להדביק על שכבה אחרת. בין שכבות מאותו סוג מועתק הסגנון המלא; בין טקסט לתמונה (ולהפך) מועתקים
+  // רק המאפיינים המשותפים (סיבוב, היפוך, שקיפות), כי לשאר המאפיינים אין מקבילה בסוג השני
   function copyStyle() {
-    if (!selected) return;
-    const { text, x, y, id, locked, ...style } = selected;
-    setCopiedStyle(style);
+    if (imageSelected) {
+      const { x, y, locked, ...style } = img;
+      setCopiedStyle({ kind: 'image', style });
+    } else if (selected) {
+      const { text, x, y, id, locked, ...style } = selected;
+      setCopiedStyle({ kind: 'text', style });
+    }
   }
 
   function pasteStyle() {
     if (!copiedStyle) return;
-    updateSelected(copiedStyle);
+    if (imageSelected) {
+      if (copiedStyle.kind === 'image') {
+        updateImg(copiedStyle.style);
+      } else {
+        const { rotation, flipH, flipV, opacity } = copiedStyle.style;
+        updateImg({ rotation, flipH, flipV, opacity });
+      }
+    } else if (selected) {
+      if (copiedStyle.kind === 'text') {
+        updateSelected(copiedStyle.style);
+      } else {
+        const { rotation, flipH, flipV, opacity } = copiedStyle.style;
+        updateSelected({ rotation, flipH, flipV, opacity });
+      }
+    }
   }
 
   function updateImg(patch: Partial<ImgTransform>, withSnapshot = true) {
@@ -1131,6 +1252,38 @@ export default function Studio() {
       copy.unshift(item);
       return copy;
     });
+  }
+
+  // הזזת שכבה צעד אחד קדימה/אחורה בסדר (לשימוש בפאנל השכבות)
+  function moveLayerUp(id: number) {
+    snapshot();
+    setLayers((ls) => {
+      const idx = ls.findIndex((l) => l.id === id);
+      if (idx < 0 || idx === ls.length - 1) return ls;
+      const copy = [...ls];
+      [copy[idx], copy[idx + 1]] = [copy[idx + 1], copy[idx]];
+      return copy;
+    });
+  }
+
+  function moveLayerDown(id: number) {
+    snapshot();
+    setLayers((ls) => {
+      const idx = ls.findIndex((l) => l.id === id);
+      if (idx <= 0) return ls;
+      const copy = [...ls];
+      [copy[idx], copy[idx - 1]] = [copy[idx - 1], copy[idx]];
+      return copy;
+    });
+  }
+
+  function toggleLayerHidden(id: number) {
+    snapshot();
+    setLayers((ls) => ls.map((l) => (l.id === id ? { ...l, hidden: !l.hidden } : l)));
+  }
+
+  function toggleImgHidden() {
+    updateImg({ hidden: !img.hidden });
   }
 
   // מיקום התיבה של השכבה הנבחרת (נמדד בפועל דרך onLayout ב-DraggableText)
@@ -1200,7 +1353,9 @@ export default function Studio() {
   const [inspiration, setInspiration] = useState<Product[]>([]);
   const [scrollLocked, setScrollLocked] = useState(false);
   const [openPanel, setOpenPanel] = useState<null | 'font' | 'color' | 'highlight' | 'more' | 'align'>(null);
-  const [copiedStyle, setCopiedStyle] = useState<Partial<Layer> | null>(null);
+  const [copiedStyle, setCopiedStyle] = useState<
+    { kind: 'text'; style: Partial<Layer> } | { kind: 'image'; style: Partial<ImgTransform> } | null
+  >(null);
   const fontScrollRef = useRef<ScrollView>(null);
   const fontScrollX = useRef(0);
   const [shirtPaletteOpen, setShirtPaletteOpen] = useState(false);
@@ -1214,6 +1369,8 @@ export default function Studio() {
   const [graphicsOpen, setGraphicsOpen] = useState(false);
   const [graphicsQuery, setGraphicsQuery] = useState('');
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [layersPanelOpen, setLayersPanelOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   useEffect(() => {
     if (isConfigured()) {
@@ -1228,6 +1385,31 @@ export default function Studio() {
     const l = { ...newLayer(), text: char, size: 42 };
     setLayers((ls) => [...ls, l]);
     setSelectedId(l.id);
+  }
+
+  // טעינת תבנית מוכנה — מחליפה את שכבות הטקסט הנוכחיות (התמונה, אם יש, נשארת כמות שהיא)
+  function applyDesignTemplate(tpl: TemplateDef) {
+    const hasExistingText = layers.some((l) => l.text.trim());
+    const doApply = () => {
+      snapshot();
+      const built = tpl.layers.map((partial) => ({ ...newLayer(), ...partial, id: nextId++ }));
+      setLayers(built);
+      setSelectedId(null);
+      setImageSelected(false);
+      if (tpl.shirtHex) {
+        const found = SHIRT_COLORS.find((c) => c.hex === tpl.shirtHex);
+        setShirt(found ?? { name: 'מותאם אישית', hex: tpl.shirtHex });
+      }
+      setTemplatesOpen(false);
+    };
+    if (hasExistingText) {
+      Alert.alert('טעינת תבנית', 'הפעולה תחליף את הטקסטים הקיימים על החולצה. להמשיך?', [
+        { text: 'ביטול', style: 'cancel' },
+        { text: 'טעינה', style: 'destructive', onPress: doApply },
+      ]);
+    } else {
+      doApply();
+    }
   }
 
   async function useTemplate(p: Product) {
@@ -1328,9 +1510,9 @@ export default function Studio() {
         { key: 'צבע חולצה', value: shirt.name },
         { key: 'מידה', value: size },
       ];
-      if (cloudUrl) attributes.push({ key: 'קובץ עיצוב', value: cloudUrl });
+      if (cloudUrl && !img.hidden) attributes.push({ key: 'קובץ עיצוב', value: cloudUrl });
       layers
-        .filter((l) => l.text.trim())
+        .filter((l) => l.text.trim() && !l.hidden)
         .forEach((l, i) => {
           const details = [
             `פונט ${l.font.name}`,
@@ -1358,7 +1540,7 @@ export default function Studio() {
             .join(' · ');
           attributes.push({ key: `טקסט ${i + 1}`, value: l.text.trim() }, { key: `טקסט ${i + 1} — עיצוב`, value: details });
         });
-      if (cloudUrl) {
+      if (cloudUrl && !img.hidden) {
         const imgDetails = [
           `גודל ${img.w}×${img.h}px`,
           `מיקום ${Math.round((img.x / AREA_W) * 100)}%,${Math.round((img.y / AREA_H) * 100)}%`,
@@ -1382,8 +1564,8 @@ export default function Studio() {
         image: cloudUrl,
         design: {
           shirtHex: shirt.hex,
-          image: cloudUrl,
-          imageTransform: cloudUrl
+          image: img.hidden ? undefined : cloudUrl,
+          imageTransform: cloudUrl && !img.hidden
             ? {
                 x: img.x,
                 y: img.y,
@@ -1403,11 +1585,12 @@ export default function Studio() {
               }
             : undefined,
           layers: layers
-            .filter((l) => l.text.trim())
+            .filter((l) => l.text.trim() && !l.hidden)
             .map((l) => ({
               text: l.text,
               fontFamily: l.font.family,
               color: l.color,
+              gradient: l.gradient,
               size: l.size,
               width: l.width,
               x: l.x,
@@ -1725,7 +1908,13 @@ export default function Studio() {
               </Pressable>
 
               <Pressable
-                style={[st.toolColorBtn, { backgroundColor: selected.color }]}
+                style={[
+                  st.toolColorBtn,
+                  { backgroundColor: selected.color },
+                  selected.gradient != null && Platform.OS === 'web'
+                    ? ({ backgroundImage: `linear-gradient(90deg, ${GRADIENT_PRESETS.find((g) => g.key === selected.gradient)?.colors.join(', ')})` } as any)
+                    : null,
+                ]}
                 onPress={() => setOpenPanel((p) => (p === 'color' ? null : 'color'))}
               />
 
@@ -1999,14 +2188,44 @@ export default function Studio() {
 
             {openPanel === 'color' && (
               <View>
+                <Text style={st.subLabel}>אפקט גרדיאנט</Text>
+                <View style={st.row}>
+                  {GRADIENT_PRESETS.map((g) => (
+                    <Pressable
+                      key={g.key}
+                      onPress={() => updateSelected({ gradient: g.key, color: g.fallbackColor })}
+                      style={[
+                        st.gradientSwatch,
+                        Platform.OS === 'web'
+                          ? ({ backgroundImage: `linear-gradient(90deg, ${g.colors.join(', ')})` } as any)
+                          : { backgroundColor: g.fallbackColor },
+                        selected.gradient === g.key && st.swatchActive,
+                      ]}
+                    >
+                      <Text style={st.gradientSwatchLabel}>{g.label}</Text>
+                    </Pressable>
+                  ))}
+                  {selected.gradient != null && (
+                    <Pressable
+                      onPress={() => updateSelected({ gradient: null })}
+                      style={[st.gradientSwatch, { backgroundColor: C.bg }]}
+                    >
+                      <Text style={st.gradientSwatchLabel}>✕ ביטול</Text>
+                    </Pressable>
+                  )}
+                </View>
+                {Platform.OS !== 'web' && (
+                  <Text style={st.hint}>באפליקציה הגרדיאנט מוצג כצבע אחיד קרוב — התצוגה המלאה זמינה כרגע בדפדפן</Text>
+                )}
+                <Text style={st.subLabel}>צבע רגיל</Text>
                 <ScrollView style={st.paletteScroll} nestedScrollEnabled showsVerticalScrollIndicator>
                   {PALETTE_GRID.map((row, ri) => (
                     <View style={st.row} key={ri}>
                       {row.map((c, ci) => (
                         <Pressable
                           key={c + ci}
-                          onPress={() => updateSelected({ color: c })}
-                          style={[st.swatchSm, { backgroundColor: c }, selected.color === c && st.swatchActive]}
+                          onPress={() => updateSelected({ color: c, gradient: null })}
+                          style={[st.swatchSm, { backgroundColor: c }, selected.color === c && selected.gradient == null && st.swatchActive]}
                         />
                       ))}
                     </View>
@@ -2038,7 +2257,7 @@ export default function Studio() {
         {/* תצוגה מקדימה */}
         <View style={[st.shirtPreview, { backgroundColor: shirt.hex }]}>
           <View style={[st.printArea, { borderColor: lightShirt ? '#00000022' : '#ffffff22' }]}>
-            {localImg && (
+            {localImg && !img.hidden && (
               <DraggableImage
                 uri={localImg}
                 img={img}
@@ -2061,7 +2280,7 @@ export default function Studio() {
                 אזור ההדפסה
               </Text>
             )}
-            {layers.map((l) => (
+            {layers.filter((l) => !l.hidden).map((l) => (
               <DraggableText
                 key={l.id}
                 layer={l}
@@ -2115,13 +2334,13 @@ export default function Studio() {
               <Text style={st.adviceLine}>ℹ️ לעיצוב יש רקע שקוף — ודאו שזה מתאים לצבע החולצה שבחרתם</Text>
             )}
             {layers
-              .filter((l) => l.text.trim() && colorDistance(l.color, shirt.hex) < 60)
+              .filter((l) => l.text.trim() && !l.hidden && colorDistance(l.color, shirt.hex) < 60)
               .map((l) => (
                 <Text key={l.id} style={st.adviceLine}>
                   ⚠️ הטקסט "{l.text.trim().slice(0, 12)}" קרוב בצבעו לצבע החולצה — עלול לא לבלוט
                 </Text>
               ))}
-            {!layers.some((l) => l.text.trim() && colorDistance(l.color, shirt.hex) < 60) &&
+            {!layers.some((l) => l.text.trim() && !l.hidden && colorDistance(l.color, shirt.hex) < 60) &&
               !hasTransparency &&
               !(naturalImgSize && (Math.min(naturalImgSize.w, naturalImgSize.h) < 1000 || img.w / AREA_W < 0.25)) && (
                 <Text style={st.adviceLineOk}>✓ נראה תקין להדפסה</Text>
@@ -2141,12 +2360,12 @@ export default function Studio() {
               <Text style={st.deleteText}>⧉ שכפול</Text>
             </Pressable>
           )}
-          {selected && (
+          {(selected || imageSelected) && (
             <Pressable style={st.deleteBtn} onPress={copyStyle}>
               <Text style={st.deleteText}>🖌 העתק סגנון</Text>
             </Pressable>
           )}
-          {selected && copiedStyle && (
+          {(selected || imageSelected) && copiedStyle && (
             <Pressable style={st.deleteBtn} onPress={pasteStyle}>
               <Text style={st.deleteText}>🖌 הדבק סגנון</Text>
             </Pressable>
@@ -2154,6 +2373,14 @@ export default function Studio() {
           <Pressable style={st.graphicsBtn} onPress={() => setGraphicsOpen(true)}>
             <Text style={st.graphicsBtnText}>🖼 גרפיקות</Text>
           </Pressable>
+          <Pressable style={st.graphicsBtn} onPress={() => setTemplatesOpen(true)}>
+            <Text style={st.graphicsBtnText}>📐 תבניות</Text>
+          </Pressable>
+          {(layers.length > 0 || localImg) && (
+            <Pressable style={st.graphicsBtn} onPress={() => setLayersPanelOpen(true)}>
+              <Text style={st.graphicsBtnText}>📚 שכבות</Text>
+            </Pressable>
+          )}
           <Pressable style={st.graphicsBtn} onPress={pickImage} disabled={uploading}>
             <Text style={st.graphicsBtnText}>{localImg ? '📤 החלפת תמונה' : '📤 העלאת עיצוב'}</Text>
           </Pressable>
@@ -2274,7 +2501,7 @@ export default function Studio() {
           <View style={[st.zoomShirt, { backgroundColor: shirt.hex }]}>
             <View style={{ transform: [{ scale: 1.45 }] }}>
               <View style={[st.printArea, { borderColor: 'transparent' }]}>
-                {localImg && (
+                {localImg && !img.hidden && (
                   <View
                     style={{
                       position: 'absolute',
@@ -2310,7 +2537,7 @@ export default function Studio() {
                     />
                   </View>
                 )}
-                {layers.map((l) => (
+                {layers.filter((l) => !l.hidden).map((l) => (
                   <View
                     key={l.id}
                     style={[
@@ -2365,6 +2592,7 @@ export default function Studio() {
                           : l.shadow
                             ? { textShadowColor: '#00000099', textShadowRadius: 4, textShadowOffset: { width: 2, height: 3 } }
                             : null,
+                        gradientWebStyle(l.gradient),
                       ]}
                       numberOfLines={l.width != null ? undefined : 3}
                     >
@@ -2445,6 +2673,153 @@ export default function Studio() {
                   </View>
                 ))
               )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* פאנל שכבות — רשימת כל השכבות (תמונה + טקסטים) עם הצג/הסתר, נעילה, והזזה קדימה/אחורה */}
+      <Modal visible={layersPanelOpen} transparent animationType="slide" onRequestClose={() => setLayersPanelOpen(false)}>
+        <View style={st.graphicsBackdrop}>
+          <View style={st.graphicsSheet}>
+            <View style={st.graphicsHeader}>
+              <Text style={st.graphicsTitle}>שכבות</Text>
+              <Pressable onPress={() => setLayersPanelOpen(false)} hitSlop={8}>
+                <Text style={st.graphicsClose}>✕</Text>
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={st.graphicsScroll}>
+              {[...layers].reverse().map((l, revIdx) => {
+                const isTop = revIdx === 0;
+                const isBottom = revIdx === layers.length - 1;
+                return (
+                  <View key={l.id} style={[st.layerRow, l.id === selectedId && st.layerRowActive]}>
+                    <Pressable
+                      style={st.layerRowMain}
+                      onPress={() => {
+                        setSelectedId(l.id);
+                        setImageSelected(false);
+                        setLayersPanelOpen(false);
+                      }}
+                    >
+                      <Text style={st.layerRowText} numberOfLines={1}>
+                        {l.text.trim() ? l.text.trim().slice(0, 20) : 'טקסט ריק'}
+                      </Text>
+                    </Pressable>
+                    <View style={st.layerRowActions}>
+                      <Pressable style={st.toolIconBtn} onPress={() => moveLayerDown(l.id)} disabled={isBottom}>
+                        <Text style={[st.toolIconGlyph, isBottom && { opacity: 0.3 }]}>⬇</Text>
+                      </Pressable>
+                      <Pressable style={st.toolIconBtn} onPress={() => moveLayerUp(l.id)} disabled={isTop}>
+                        <Text style={[st.toolIconGlyph, isTop && { opacity: 0.3 }]}>⬆</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[st.toolIconBtn, l.locked && st.btnActive]}
+                        onPress={() => setLayers((ls) => ls.map((li) => (li.id === l.id ? { ...li, locked: !li.locked } : li)))}
+                      >
+                        <Text style={[st.toolIconGlyph, l.locked && st.textActive]}>🔒</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[st.toolIconBtn, l.hidden && st.btnActive]}
+                        onPress={() => toggleLayerHidden(l.id)}
+                      >
+                        <Text style={[st.toolIconGlyph, l.hidden && st.textActive]}>{l.hidden ? '🙈' : '👁'}</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              })}
+              {localImg && (
+                <View style={[st.layerRow, imageSelected && st.layerRowActive]}>
+                  <Pressable
+                    style={st.layerRowMain}
+                    onPress={() => {
+                      setImageSelected(true);
+                      setSelectedId(null);
+                      setLayersPanelOpen(false);
+                    }}
+                  >
+                    <Text style={st.layerRowText} numberOfLines={1}>🖼 תמונה (תמיד מאחורי הטקסטים)</Text>
+                  </Pressable>
+                  <View style={st.layerRowActions}>
+                    <Pressable
+                      style={[st.toolIconBtn, img.locked && st.btnActive]}
+                      onPress={() => updateImg({ locked: !img.locked }, false)}
+                    >
+                      <Text style={[st.toolIconGlyph, img.locked && st.textActive]}>🔒</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[st.toolIconBtn, img.hidden && st.btnActive]}
+                      onPress={toggleImgHidden}
+                    >
+                      <Text style={[st.toolIconGlyph, img.hidden && st.textActive]}>{img.hidden ? '🙈' : '👁'}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+              {layers.length === 0 && !localImg && (
+                <Text style={st.graphicsEmpty}>אין עדיין שכבות — הוסיפו טקסט או תמונה</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* פאנל תבניות מוכנות — כל כרטיס מציג תצוגה מוקטנת אמיתית של שכבות התבנית */}
+      <Modal visible={templatesOpen} transparent animationType="slide" onRequestClose={() => setTemplatesOpen(false)}>
+        <View style={st.graphicsBackdrop}>
+          <View style={st.graphicsSheet}>
+            <View style={st.graphicsHeader}>
+              <Text style={st.graphicsTitle}>תבניות</Text>
+              <Pressable onPress={() => setTemplatesOpen(false)} hitSlop={8}>
+                <Text style={st.graphicsClose}>✕</Text>
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={st.templatesGrid}>
+              {TEMPLATES.map((tpl) => {
+                const scale = TEMPLATE_THUMB_W / AREA_W;
+                const thumbShirt = tpl.shirtHex ?? shirt.hex;
+                const thumbLight = colorDistance(thumbShirt, '#ffffff') < colorDistance(thumbShirt, '#000000');
+                return (
+                  <Pressable key={tpl.id} style={st.templateCard} onPress={() => applyDesignTemplate(tpl)}>
+                    <View style={[st.templateThumb, { backgroundColor: thumbShirt }]}>
+                      <View
+                        style={[
+                          st.templateThumbArea,
+                          { borderColor: thumbLight ? '#00000022' : '#ffffff22' },
+                        ]}
+                      >
+                        {tpl.layers.map((l, i) => (
+                          <Text
+                            key={i}
+                            style={[
+                              {
+                                position: 'absolute',
+                                left: (l.x ?? AREA_W / 2) * scale,
+                                top: (l.y ?? AREA_H / 2) * scale,
+                                transform: [
+                                  { translateX: '-50%' as never },
+                                  { translateY: '-50%' as never },
+                                  { rotate: `${l.rotation ?? 0}deg` },
+                                ],
+                                fontFamily: (l.font ?? FONTS[0]).family,
+                                color: l.color ?? '#ffffff',
+                                fontSize: Math.max(6, Math.round((l.size ?? 26) * scale)),
+                                fontWeight: l.bold ? '700' : 'normal',
+                              },
+                              gradientWebStyle(l.gradient ?? null),
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {l.text}
+                          </Text>
+                        ))}
+                      </View>
+                    </View>
+                    <Text style={st.templateName}>{tpl.name}</Text>
+                  </Pressable>
+                );
+              })}
             </ScrollView>
           </View>
         </View>
@@ -2647,6 +3022,22 @@ const st = StyleSheet.create({
   },
   graphicChar: { fontSize: 28 },
   graphicsEmpty: { color: C.textDim, fontSize: 14, textAlign: 'center', marginTop: S.xl },
+  layerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: R.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: S.sm,
+  },
+  layerRowActive: { borderColor: C.accent },
+  layerRowMain: { flex: 1 },
+  layerRowText: { color: C.text, fontSize: 14, fontWeight: '700', textAlign: 'right' },
+  layerRowActions: { flexDirection: 'row', gap: 6, marginRight: S.sm },
   symbolBtn: {
     width: 48,
     height: 48,
@@ -2846,8 +3237,46 @@ const st = StyleSheet.create({
     justifyContent: 'center',
   },
   swatchActive: { borderColor: C.accent, borderWidth: 3 },
+  gradientSwatch: {
+    minWidth: 64,
+    height: 34,
+    borderRadius: R.sm,
+    borderWidth: 2,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  gradientSwatchLabel: {
+    color: '#00000099',
+    fontSize: 11,
+    fontWeight: '800',
+    textShadowColor: '#ffffffaa',
+    textShadowRadius: 2,
+    textShadowOffset: { width: 0, height: 0 },
+  },
   noneSwatch: { backgroundColor: C.bg },
   noneText: { color: C.textDim, fontSize: 14, fontWeight: '800' },
+  templatesGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: S.md, paddingBottom: S.xl },
+  templateCard: { width: TEMPLATE_THUMB_W, alignItems: 'center' },
+  templateThumb: {
+    width: TEMPLATE_THUMB_W,
+    height: TEMPLATE_THUMB_H,
+    borderRadius: R.md,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  templateThumbArea: {
+    width: TEMPLATE_THUMB_W - 16,
+    height: TEMPLATE_THUMB_H - 16,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: R.sm,
+  },
+  templateName: { color: C.text, fontSize: 12, fontWeight: '700', marginTop: 4, textAlign: 'center' },
   hint: { color: C.textDim, fontSize: 13, marginTop: 6, textAlign: 'right' },
   sizeBtn: {
     minWidth: 52,
