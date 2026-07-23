@@ -598,7 +598,7 @@ function DraggableImage({
           const isCorner = kind.length === 2;
           const isVerticalBar = kind === 'w' || kind === 'e';
           const shape = isCorner ? st.handleCorner : isVerticalBar ? st.handleBarV : st.handleBarH;
-          const HIT = 22;
+          const HIT = 34;
           return (
             <View
               key={kind}
@@ -876,7 +876,7 @@ function DraggableText({
           const shape = isCorner ? st.handleCorner : isVerticalBar ? st.handleBarV : st.handleBarH;
           // בלי transform למרכוז — ב-RN באנדרואיד אזור המגע לא תמיד עוקב אחרי transform,
           // אז ממקמים בחישוב ישיר (הפינה השמאלית-עליונה של אזור המגע) כדי שהמגע יתאים בדיוק למה שרואים
-          const HIT = 22;
+          const HIT = 34;
           return (
             <View
               key={kind}
@@ -2536,10 +2536,12 @@ const st = StyleSheet.create({
   removeImgText: { color: C.danger, fontSize: 18, fontWeight: '800' },
   resizeHandleHit: {
     position: 'absolute',
-    width: 22,
-    height: 22,
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 20,
+    elevation: 20,
   },
   handleCorner: {
     width: 11,
