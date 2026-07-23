@@ -771,6 +771,32 @@ const TEMPLATES: TemplateDef[] = [
   },
 ];
 
+// עיצובים גרפיים מוכנים (איורים) — בניגוד ל-TEMPLATES (שילובי טקסט), אלה תמונות שלמות שנבחרות
+// ישירות ועוברות באותו נתיב בדיוק כמו תמונה שהלקוח מעלה בעצמו (כולל שמירה בענן ובדיקת איכות)
+type ReadyDesign = { id: string; name: string; source: number };
+const READY_DESIGNS: ReadyDesign[] = [
+  { id: 'detective', name: 'בלשית', source: require('../../assets/designs/detective.jpg') },
+  { id: 'scientist', name: 'מדענית', source: require('../../assets/designs/scientist.jpg') },
+  { id: 'sundress', name: 'שמלת קיץ', source: require('../../assets/designs/sundress.jpg') },
+  { id: 'sporty', name: 'ספורטיבית', source: require('../../assets/designs/sporty.jpg') },
+  { id: 'cozy', name: 'חורף נעים', source: require('../../assets/designs/cozy.jpg') },
+  { id: 'futuristic', name: 'עתידנית', source: require('../../assets/designs/futuristic.jpg') },
+  { id: 'rocker', name: 'רוקנית', source: require('../../assets/designs/rocker.jpg') },
+  { id: 'mystic', name: 'מיסטית', source: require('../../assets/designs/mystic.jpg') },
+  { id: 'reader', name: 'קוראת ספרים', source: require('../../assets/designs/reader.jpg') },
+  { id: 'traveler', name: 'תיירת', source: require('../../assets/designs/traveler.jpg') },
+  { id: 'equestrian', name: 'רוכבת סוסים', source: require('../../assets/designs/equestrian.jpg') },
+  { id: 'dancer', name: 'רקדנית מסורתית', source: require('../../assets/designs/dancer.jpg') },
+  { id: 'yoga', name: 'יוגה', source: require('../../assets/designs/yoga.jpg') },
+  { id: 'librarian', name: 'ספרנית', source: require('../../assets/designs/librarian.jpg') },
+  { id: 'pilot', name: 'טייסת', source: require('../../assets/designs/pilot.jpg') },
+  { id: 'gardener', name: 'גננת', source: require('../../assets/designs/gardener.jpg') },
+  { id: 'evening', name: 'שמלת ערב', source: require('../../assets/designs/evening.jpg') },
+  { id: 'chef', name: 'שפית', source: require('../../assets/designs/chef.jpg') },
+  { id: 'winter', name: 'חורף', source: require('../../assets/designs/winter.jpg') },
+  { id: 'artist', name: 'ציירת', source: require('../../assets/designs/artist.jpg') },
+];
+
 // גרירת עכבר לידיות ההגדלה — נדרש רק בדפדפן מחשב (PanResponder של רקטיב-נייטיב מיועד למגע)
 function webHandleHandlers(
   kind: HandleKind,
@@ -1371,6 +1397,7 @@ export default function Studio() {
   const [zoomOpen, setZoomOpen] = useState(false);
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [readyDesignsOpen, setReadyDesignsOpen] = useState(false);
 
   useEffect(() => {
     if (isConfigured()) {
@@ -1421,6 +1448,31 @@ export default function Studio() {
     setHasTransparency(false);
     try {
       const url = await uploadRemote(p.image);
+      setCloudUrl(url);
+      fitImageBox(url);
+    } catch {
+      Alert.alert('שגיאה', 'טעינת העיצוב נכשלה, נסו שוב');
+      setLocalImg(null);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  // בחירת עיצוב מוכן מהגלריה — מפענח את קובץ ה-asset המצורף לאפליקציה לכתובת אמיתית,
+  // ואז מעלה אותו ל-Cloudinary בדיוק כמו תמונה שהלקוח מעלה בעצמו, כדי שתהיה לו כתובת cloudUrl
+  // תקינה להדפסה
+  async function useReadyDesign(design: ReadyDesign) {
+    if (uploading) return;
+    const resolved = RNImage.resolveAssetSource(design.source);
+    if (!resolved?.uri) return;
+    snapshot();
+    setLocalImg(resolved.uri);
+    setUploading(true);
+    setCloudUrl(null);
+    setHasTransparency(false);
+    setReadyDesignsOpen(false);
+    try {
+      const url = await uploadImage(resolved.uri);
       setCloudUrl(url);
       fitImageBox(url);
     } catch {
@@ -2376,6 +2428,9 @@ export default function Studio() {
           <Pressable style={st.graphicsBtn} onPress={() => setTemplatesOpen(true)}>
             <Text style={st.graphicsBtnText}>📐 תבניות</Text>
           </Pressable>
+          <Pressable style={st.graphicsBtn} onPress={() => setReadyDesignsOpen(true)} disabled={uploading}>
+            <Text style={st.graphicsBtnText}>🎨 עיצובים מוכנים</Text>
+          </Pressable>
           {(layers.length > 0 || localImg) && (
             <Pressable style={st.graphicsBtn} onPress={() => setLayersPanelOpen(true)}>
               <Text style={st.graphicsBtnText}>📚 שכבות</Text>
@@ -2820,6 +2875,30 @@ export default function Studio() {
                   </Pressable>
                 );
               })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* פאנל עיצובים מוכנים — גלריית איורים שלמים לבחירה ישירה, נטענת בדיוק כמו תמונה שהועלתה */}
+      <Modal visible={readyDesignsOpen} transparent animationType="slide" onRequestClose={() => setReadyDesignsOpen(false)}>
+        <View style={st.graphicsBackdrop}>
+          <View style={st.graphicsSheet}>
+            <View style={st.graphicsHeader}>
+              <Text style={st.graphicsTitle}>עיצובים מוכנים</Text>
+              <Pressable onPress={() => setReadyDesignsOpen(false)} hitSlop={8}>
+                <Text style={st.graphicsClose}>✕</Text>
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={st.templatesGrid}>
+              {READY_DESIGNS.map((d) => (
+                <Pressable key={d.id} style={st.templateCard} onPress={() => useReadyDesign(d)}>
+                  <View style={st.readyDesignThumb}>
+                    <Image source={d.source} style={st.readyDesignImg} contentFit="contain" />
+                  </View>
+                  <Text style={st.templateName}>{d.name}</Text>
+                </Pressable>
+              ))}
             </ScrollView>
           </View>
         </View>
@@ -3277,6 +3356,16 @@ const st = StyleSheet.create({
     borderRadius: R.sm,
   },
   templateName: { color: C.text, fontSize: 12, fontWeight: '700', marginTop: 4, textAlign: 'center' },
+  readyDesignThumb: {
+    width: TEMPLATE_THUMB_W,
+    height: TEMPLATE_THUMB_H,
+    borderRadius: R.md,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+  },
+  readyDesignImg: { width: '100%', height: '100%' },
   hint: { color: C.textDim, fontSize: 13, marginTop: 6, textAlign: 'right' },
   sizeBtn: {
     minWidth: 52,
