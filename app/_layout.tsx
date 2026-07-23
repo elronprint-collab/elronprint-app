@@ -24,7 +24,6 @@ export default function RootLayout() {
     Heebo: require('../assets/fonts/Heebo.ttf'),
     Rubik: require('../assets/fonts/Rubik.ttf'),
     SecularOne: require('../assets/fonts/SecularOne.ttf'),
-    AmaticSC: require('../assets/fonts/AmaticSC.ttf'),
     Assistant: require('../assets/fonts/Assistant.ttf'),
     VarelaRound: require('../assets/fonts/VarelaRound.ttf'),
     SuezOne: require('../assets/fonts/SuezOne.ttf'),
@@ -33,12 +32,7 @@ export default function RootLayout() {
     FrankRuhl: require('../assets/fonts/FrankRuhl.ttf'),
     DavidLibre: require('../assets/fonts/DavidLibre.ttf'),
     MiriamLibre: require('../assets/fonts/MiriamLibre.ttf'),
-    Bellefair: require('../assets/fonts/Bellefair.ttf'),
-    PlexHebrew: require('../assets/fonts/PlexHebrew.ttf'),
-    Solitreo: require('../assets/fonts/Solitreo.ttf'),
     NotoHebrew: require('../assets/fonts/NotoHebrew.ttf'),
-    NotoSerif: require('../assets/fonts/NotoSerif.ttf'),
-    Rashi: require('../assets/fonts/Rashi.ttf'),
   });
 
   if (!fontsLoaded) {
