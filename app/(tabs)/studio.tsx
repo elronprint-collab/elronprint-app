@@ -107,6 +107,25 @@ const GRAPHIC_CATEGORIES: GraphicCategory[] = [
     ],
   },
   {
+    name: 'תגים וחותמות',
+    items: [
+      { char: '🏅', keywords: ['מדליה', 'תג'] },
+      { char: '🎖️', keywords: ['מדליה', 'עיטור'] },
+      { char: '🥇', keywords: ['זהב', 'מקום ראשון'] },
+      { char: '🥈', keywords: ['כסף', 'מקום שני'] },
+      { char: '🥉', keywords: ['ארד', 'מקום שלישי'] },
+      { char: '🏆', keywords: ['גביע', 'ניצחון'] },
+      { char: '🛡️', keywords: ['מגן', 'שריון'] },
+      { char: '⚜️', keywords: ['סמל', 'צרפתי'] },
+      { char: '📛', keywords: ['תג שם'] },
+      { char: '🔖', keywords: ['סימנייה', 'תג'] },
+      { char: '✅', keywords: ['וי', 'אישור'] },
+      { char: '☑️', keywords: ['וי', 'תיבת סימון'] },
+      { char: '💯', keywords: ['מאה', 'מושלם'] },
+      { char: '🔰', keywords: ['סמל', 'התחלה'] },
+    ],
+  },
+  {
     name: 'פרחים וטבע',
     items: [
       { char: '🌸', keywords: ['פרח', 'ורוד'] },
