@@ -773,7 +773,7 @@ const TEMPLATES: TemplateDef[] = [
 
 // עיצובים גרפיים מוכנים (איורים) — בניגוד ל-TEMPLATES (שילובי טקסט), אלה תמונות שלמות שנבחרות
 // ישירות ועוברות באותו נתיב בדיוק כמו תמונה שהלקוח מעלה בעצמו (כולל שמירה בענן ובדיקת איכות)
-type ReadyDesign = { id: string; name: string; source: number };
+type ReadyDesign = { id: string; name: string; source: number | string };
 const READY_DESIGNS: ReadyDesign[] = [
   { id: 'detective', name: 'בלשית', source: require('../../assets/designs/detective.jpg') },
   { id: 'scientist', name: 'מדענית', source: require('../../assets/designs/scientist.jpg') },
@@ -1463,16 +1463,22 @@ export default function Studio() {
   // תקינה להדפסה
   async function useReadyDesign(design: ReadyDesign) {
     if (uploading) return;
-    const resolved = RNImage.resolveAssetSource(design.source);
-    if (!resolved?.uri) return;
+    // בדפדפן (web), require(תמונה) מחזיר ישירות מחרוזת URL; בנייד זה מחזיר מזהה asset מספרי
+    // שצריך לפענח דרך resolveAssetSource. בלי הבדיקה הזו הלחיצה בדפדפן לא עשתה כלום בשקט.
+    const src: any = design.source;
+    const uri = typeof src === 'string' ? src : RNImage.resolveAssetSource(src)?.uri;
+    if (!uri) {
+      Alert.alert('שגיאה', 'טעינת העיצוב נכשלה, נסו שוב');
+      return;
+    }
     snapshot();
-    setLocalImg(resolved.uri);
+    setLocalImg(uri);
     setUploading(true);
     setCloudUrl(null);
     setHasTransparency(false);
     setReadyDesignsOpen(false);
     try {
-      const url = await uploadImage(resolved.uri);
+      const url = await uploadImage(uri);
       setCloudUrl(url);
       fitImageBox(url);
     } catch {
