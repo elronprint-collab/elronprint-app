@@ -46,10 +46,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="shop" options={{ title: 'חנות', tabBarIcon: icon('▦') }} />
       <Tabs.Screen name="cart" options={{ title: 'עגלה', tabBarIcon: (p) => <CartIcon {...p} /> }} />
       <Tabs.Screen name="account" options={{ title: 'חשבון', tabBarIcon: icon('◉') }} />
-      <Tabs.Screen
-        name="product/[handle]"
-        options={{ href: null, tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }}
-      />
+      <Tabs.Screen name="product/[handle]" options={{ tabBarButton: () => null }} />
     </Tabs>
   );
 }
