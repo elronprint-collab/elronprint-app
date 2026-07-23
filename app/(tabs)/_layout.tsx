@@ -39,6 +39,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: C.accent,
         tabBarInactiveTintColor: C.textDim,
         tabBarLabelStyle: { fontSize: 12, fontWeight: "700", marginTop: 2 },
+        tabBarItemStyle: { flex: 1 },
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'בית', tabBarIcon: icon('⌂') }} />
@@ -46,7 +47,10 @@ export default function TabsLayout() {
       <Tabs.Screen name="shop" options={{ title: 'חנות', tabBarIcon: icon('▦') }} />
       <Tabs.Screen name="cart" options={{ title: 'עגלה', tabBarIcon: (p) => <CartIcon {...p} /> }} />
       <Tabs.Screen name="account" options={{ title: 'חשבון', tabBarIcon: icon('◉') }} />
-      <Tabs.Screen name="product/[handle]" options={{ tabBarButton: () => null }} />
+      <Tabs.Screen
+        name="product/[handle]"
+        options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0 } }}
+      />
     </Tabs>
   );
 }
