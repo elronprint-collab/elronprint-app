@@ -377,16 +377,17 @@ function computeResizePatch(
       const diag = (-dx - dy) / 2;
       return { size: clamp(Math.round(base.size + diag * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE), width: clamp(Math.round(base.width + diag), MIN_BOX_WIDTH, MAX_BOX_WIDTH) };
     }
-    case 'e':
-      return {
-        width: clamp(Math.round(base.width + dx), MIN_BOX_WIDTH, MAX_BOX_WIDTH),
-        x: Math.round(base.x + dx / 2),
-      };
-    case 'w':
-      return {
-        width: clamp(Math.round(base.width - dx), MIN_BOX_WIDTH, MAX_BOX_WIDTH),
-        x: Math.round(base.x + dx / 2),
-      };
+    case 'e': {
+      const width = clamp(Math.round(base.width + dx), MIN_BOX_WIDTH, MAX_BOX_WIDTH);
+      // המיקום גם הוא מוגבל לפי הרוחב החדש (אחרי הקיפוא) — אותו תיקון שכבר בוצע לתמונה
+      const x = clamp(Math.round(base.x + dx / 2), width / 2, AREA_W - width / 2);
+      return { width, x };
+    }
+    case 'w': {
+      const width = clamp(Math.round(base.width - dx), MIN_BOX_WIDTH, MAX_BOX_WIDTH);
+      const x = clamp(Math.round(base.x + dx / 2), width / 2, AREA_W - width / 2);
+      return { width, x };
+    }
     case 's':
       return { size: clamp(Math.round(base.size + dy * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE) };
     case 'n':
@@ -806,8 +807,12 @@ function DraggableText({
       },
       onPanResponderMove: (_e, g) => {
         if (RESIZING.active) return; // ידית שינוי-גודל פעילה — לא להזיז את המסגרת
-        const nx = Math.min(AREA_W - 8, Math.max(8, start.current.x + g.dx));
-        const ny = Math.min(AREA_H - 8, Math.max(8, start.current.y + g.dy));
+        // הגבלת התזוזה לפי הגודל האמיתי של התיבה (לא מרווח קבוע) — אותו תיקון שכבר
+        // בוצע לתמונה, כדי שתיבת טקסט שממלאת את כל הקנבס לא תיגרר אל מחוץ לאזור ההדפסה
+        const halfW = (layerRef.current.width ?? measuredRef.current.w) / 2;
+        const halfH = (layerRef.current.height ?? measuredRef.current.h) / 2;
+        const nx = clamp(start.current.x + g.dx, halfW, AREA_W - halfW);
+        const ny = clamp(start.current.y + g.dy, halfH, AREA_H - halfH);
         onMove(nx, ny);
       },
       onPanResponderTerminationRequest: () => false,
@@ -864,7 +869,7 @@ function DraggableText({
       style={[
         st.layerWrap,
         layer.width != null && { width: layer.width },
-        layer.height != null && { height: layer.height, justifyContent: 'center' },
+        layer.height != null && { height: layer.height },
         {
           // מיקום בפיקסלים ישירים (במקום transform:translate אחוזי) — אותה גישה שכבר
           // מוכחת כעובדת נכון בתמונה; ה-transform האחוזי נחשד כמקור לבעיית הלחיצה על
@@ -882,38 +887,47 @@ function DraggableText({
         selected && st.layerSelected,
       ]}
     >
-      <Text
-        style={[
-          {
-            fontFamily: layer.font.family,
-            color: layer.color,
-            fontSize: layer.size,
-            lineHeight: Math.round(layer.size * layer.lineHeight),
-            textAlign: layer.align,
-            letterSpacing: layer.spacing,
-            fontWeight: layer.bold ? '700' : 'normal',
-            fontStyle: layer.italic ? 'italic' : 'normal',
-            textDecorationLine:
-              layer.underline && layer.strikethrough
-                ? 'underline line-through'
-                : layer.underline
-                  ? 'underline'
-                  : layer.strikethrough
-                    ? 'line-through'
-                    : 'none',
-          },
-          layer.highlight != null && {
-            backgroundColor: layer.highlight,
-            paddingHorizontal: 6,
-            paddingVertical: 2,
-            borderRadius: 3,
-          },
-          textShadow,
-        ]}
-        numberOfLines={layer.width != null ? undefined : 3}
-      >
-        {layer.text}
-      </Text>
+      {/*
+        עטיפה פנימית נפרדת רק לטקסט, עם justifyContent:'center' למירכוז אנכי בתוך
+        התיבה. ה-justifyContent הזה על התיבה החיצונית (שגם הידיות הן ילדים ישירים
+        שלה) נחשד כגורם ל-Yoga (מנוע הפריסה) להתערב במיקום ה-position:'absolute'
+        של הידיות בקצוות האנכיים — בדיוק ההבדל המבני מול התמונה, שהעטיפה שלה
+        לעולם לא השתמשה ב-justifyContent/alignItems ומעולם לא סבלה מהבעיה הזו.
+      */}
+      <View style={layer.height != null ? st.textInner : undefined}>
+        <Text
+          style={[
+            {
+              fontFamily: layer.font.family,
+              color: layer.color,
+              fontSize: layer.size,
+              lineHeight: Math.round(layer.size * layer.lineHeight),
+              textAlign: layer.align,
+              letterSpacing: layer.spacing,
+              fontWeight: layer.bold ? '700' : 'normal',
+              fontStyle: layer.italic ? 'italic' : 'normal',
+              textDecorationLine:
+                layer.underline && layer.strikethrough
+                  ? 'underline line-through'
+                  : layer.underline
+                    ? 'underline'
+                    : layer.strikethrough
+                      ? 'line-through'
+                      : 'none',
+            },
+            layer.highlight != null && {
+              backgroundColor: layer.highlight,
+              paddingHorizontal: 6,
+              paddingVertical: 2,
+              borderRadius: 3,
+            },
+            textShadow,
+          ]}
+          numberOfLines={layer.width != null ? undefined : 3}
+        >
+          {layer.text}
+        </Text>
+      </View>
       {layer.locked && selected && (
         <View style={st.lockBadge}>
           <Text style={st.lockBadgeText}>🔒</Text>
@@ -2565,6 +2579,7 @@ const st = StyleSheet.create({
   printImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   printHint: { fontSize: 14, fontWeight: '600' },
   layerWrap: { position: 'absolute', padding: 4 },
+  textInner: { flex: 1, justifyContent: 'center' },
   layerSelected: { borderWidth: 1, borderColor: C.accent, borderStyle: 'dashed', borderRadius: 4 },
   imgSelectedBorder: {
     ...(StyleSheet.absoluteFill as object),
