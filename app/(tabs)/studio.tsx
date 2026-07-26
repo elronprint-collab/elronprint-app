@@ -1623,26 +1623,6 @@ export default function Studio() {
         keyboardShouldPersistTaps="handled"
         scrollEnabled={!scrollLocked}
       >
-        <View style={st.headerRow}>
-          <Text style={st.title}>סטודיו עיצוב</Text>
-          <View style={st.historyRow}>
-            <Pressable
-              onPress={undo}
-              disabled={past.current.length === 0}
-              style={[st.arrowBtn, past.current.length === 0 && st.histBtnOff]}
-            >
-              <Text style={st.arrowText}>↶</Text>
-            </Pressable>
-            <Pressable
-              onPress={redo}
-              disabled={future.current.length === 0}
-              style={[st.arrowBtn, future.current.length === 0 && st.histBtnOff]}
-            >
-              <Text style={st.arrowText}>↷</Text>
-            </Pressable>
-          </View>
-        </View>
-
         {/* תצוגה מקדימה */}
         <View style={[st.shirtPreview, { height: AREA_H + 80, backgroundColor: shirt.hex }]}>
           <View
@@ -2289,6 +2269,20 @@ export default function Studio() {
         )}
 
         <View style={st.rowSpread}>
+          <Pressable
+            onPress={undo}
+            disabled={past.current.length === 0}
+            style={[st.arrowBtn, past.current.length === 0 && st.histBtnOff]}
+          >
+            <Text style={st.arrowText}>↶</Text>
+          </Pressable>
+          <Pressable
+            onPress={redo}
+            disabled={future.current.length === 0}
+            style={[st.arrowBtn, future.current.length === 0 && st.histBtnOff]}
+          >
+            <Text style={st.arrowText}>↷</Text>
+          </Pressable>
           {selected && (
             <Pressable style={st.deleteBtn} onPress={removeSelected}>
               <Text style={st.deleteText}>🗑 מחיקה</Text>
