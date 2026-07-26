@@ -430,14 +430,28 @@ function computeImageResizePatch(
       const w = clamp(Math.round(base.w + diag), MIN_IMG_SIZE, MAX_IMG_SIZE);
       return { w, h: Math.round(w / aspect) };
     }
-    case 'e':
-      return { w: clamp(Math.round(base.w + dx), MIN_IMG_SIZE, MAX_IMG_SIZE), x: Math.round(base.x + dx / 2) };
-    case 'w':
-      return { w: clamp(Math.round(base.w - dx), MIN_IMG_SIZE, MAX_IMG_SIZE), x: Math.round(base.x + dx / 2) };
-    case 's':
-      return { h: clamp(Math.round(base.h + dy), MIN_IMG_SIZE, MAX_IMG_SIZE_H), y: Math.round(base.y + dy / 2) };
-    case 'n':
-      return { h: clamp(Math.round(base.h - dy), MIN_IMG_SIZE, MAX_IMG_SIZE_H), y: Math.round(base.y + dy / 2) };
+    case 'e': {
+      const w = clamp(Math.round(base.w + dx), MIN_IMG_SIZE, MAX_IMG_SIZE);
+      // המיקום גם הוא מוגבל לפי הרוחב החדש (אחרי הקיפוא) — כדי שגרירה מעבר לנקודת
+      // ההקיפוא לא תמשיך לדחוף את התיבה אל מחוץ לקנבס בצד
+      const x = clamp(Math.round(base.x + dx / 2), w / 2, AREA_W - w / 2);
+      return { w, x };
+    }
+    case 'w': {
+      const w = clamp(Math.round(base.w - dx), MIN_IMG_SIZE, MAX_IMG_SIZE);
+      const x = clamp(Math.round(base.x + dx / 2), w / 2, AREA_W - w / 2);
+      return { w, x };
+    }
+    case 's': {
+      const h = clamp(Math.round(base.h + dy), MIN_IMG_SIZE, MAX_IMG_SIZE_H);
+      const y = clamp(Math.round(base.y + dy / 2), h / 2, AREA_H - h / 2);
+      return { h, y };
+    }
+    case 'n': {
+      const h = clamp(Math.round(base.h - dy), MIN_IMG_SIZE, MAX_IMG_SIZE_H);
+      const y = clamp(Math.round(base.y + dy / 2), h / 2, AREA_H - h / 2);
+      return { h, y };
+    }
   }
 }
 
