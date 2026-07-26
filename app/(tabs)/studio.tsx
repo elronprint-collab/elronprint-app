@@ -396,6 +396,10 @@ function computeResizePatch(
 
 const MIN_IMG_SIZE = 30;
 let MAX_IMG_SIZE = AREA_W - 6;
+// תקרה נפרדת לגובה (מבוססת על AREA_H, לא AREA_W) — הקנבס גבוה יותר מרחב (יחס 5:6),
+// אז תקרה משותפת אחת הייתה מגבילה את הגובה נמוך בהרבה מהגובה האמיתי של אזור ההדפסה,
+// ומונעת מהתמונה לחזור למלא את כל הגובה אחרי שהוקטנה
+let MAX_IMG_SIZE_H = AREA_H - 6;
 
 // מחשב שינוי רוחב/גובה/מיקום לתמונה לפי כיוון הידית — פינות שומרות על יחס הממדים
 function computeImageResizePatch(
@@ -431,9 +435,9 @@ function computeImageResizePatch(
     case 'w':
       return { w: clamp(Math.round(base.w - dx), MIN_IMG_SIZE, MAX_IMG_SIZE), x: Math.round(base.x + dx / 2) };
     case 's':
-      return { h: clamp(Math.round(base.h + dy), MIN_IMG_SIZE, MAX_IMG_SIZE), y: Math.round(base.y + dy / 2) };
+      return { h: clamp(Math.round(base.h + dy), MIN_IMG_SIZE, MAX_IMG_SIZE_H), y: Math.round(base.y + dy / 2) };
     case 'n':
-      return { h: clamp(Math.round(base.h - dy), MIN_IMG_SIZE, MAX_IMG_SIZE), y: Math.round(base.y + dy / 2) };
+      return { h: clamp(Math.round(base.h - dy), MIN_IMG_SIZE, MAX_IMG_SIZE_H), y: Math.round(base.y + dy / 2) };
   }
 }
 
@@ -946,6 +950,7 @@ export default function Studio() {
       AREA_H = nextH;
       MAX_BOX_WIDTH = AREA_W;
       MAX_IMG_SIZE = AREA_W - 6;
+      MAX_IMG_SIZE_H = AREA_H - 6;
       bumpCanvas((n) => n + 1);
     }
   }, [canvasAvailWidth]);
