@@ -256,6 +256,14 @@ const SLIDER_INVERTED = Platform.OS === 'web' ? true : I18nManager.isRTL;
 let AREA_W = 230;
 let AREA_H = 276; // יחס 5:6 (4500×5400) — יעודכן בפועל לפי רוחב המסך הזמין
 
+// דגל גלובלי: פעיל כל עוד גוררים ידית שינוי-גודל (של טקסט או תמונה).
+// הבאג: ב-web, ה-PanResponder של השכבה עצמה "חוטף" את הגרירה מהידית (המקוננת בתוכה) ומזיז
+// את כל המסגרת במקום להימתח — e.stopPropagation() בתוך onMouseDown של הידית לא מספיק כי
+// מנגנון ה-Responder של react-native-web פותר מי "זוכה" בגרירה בנפרד מבועות (bubbling) הרגילות
+// של React. הפתרון: הידית מדליקה את הדגל הזה לפני הגרירה, וה-PanResponder של השכבה בודק אותו
+// ומתעלם מהתזוזה כל עוד הוא דלוק.
+const RESIZING = { active: false };
+
 type Layer = {
   id: number;
   text: string;
@@ -469,6 +477,7 @@ function webImageHandleHandlers(
     onMouseDown: (e: any) => {
       e.preventDefault?.();
       e.stopPropagation?.();
+      RESIZING.active = true;
       const base = { w: imgRef.current.w, h: imgRef.current.h, x: imgRef.current.x, y: imgRef.current.y };
       const startX = e.clientX;
       const startY = e.clientY;
@@ -479,6 +488,7 @@ function webImageHandleHandlers(
       const onUp = () => {
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
+        RESIZING.active = false;
         onDragEnd();
       };
       window.addEventListener('mousemove', onMove);
@@ -512,14 +522,16 @@ function DraggableImage({
 
   const pan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !imgRef.current.locked,
-      onMoveShouldSetPanResponder: (_e, g) => !imgRef.current.locked && Math.abs(g.dx) + Math.abs(g.dy) > 2,
+      onStartShouldSetPanResponder: () => !imgRef.current.locked && !RESIZING.active,
+      onMoveShouldSetPanResponder: (_e, g) =>
+        !imgRef.current.locked && !RESIZING.active && Math.abs(g.dx) + Math.abs(g.dy) > 2,
       onPanResponderGrant: () => {
         start.current = { x: imgRef.current.x, y: imgRef.current.y };
         onDragStart();
         onSelect();
       },
       onPanResponderMove: (_e, g) => {
+        if (RESIZING.active) return; // ידית שינוי-גודל פעילה — לא להזיז את המסגרת
         const nx = Math.min(AREA_W - 8, Math.max(8, start.current.x + g.dx));
         const ny = Math.min(AREA_H - 8, Math.max(8, start.current.y + g.dy));
         onMove(nx, ny);
@@ -669,6 +681,7 @@ function webHandleHandlers(
     onMouseDown: (e: any) => {
       e.preventDefault?.();
       e.stopPropagation?.();
+      RESIZING.active = true;
       const base = {
         size: layerRef.current.size,
         width: layerRef.current.width ?? measuredRef.current.w,
@@ -683,6 +696,7 @@ function webHandleHandlers(
       const onUp = () => {
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
+        RESIZING.active = false;
         onDragEnd();
       };
       window.addEventListener('mousemove', onMove);
@@ -755,14 +769,16 @@ function DraggableText({
 
   const pan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !layerRef.current.locked,
-      onMoveShouldSetPanResponder: (_e, g) => !layerRef.current.locked && Math.abs(g.dx) + Math.abs(g.dy) > 2,
+      onStartShouldSetPanResponder: () => !layerRef.current.locked && !RESIZING.active,
+      onMoveShouldSetPanResponder: (_e, g) =>
+        !layerRef.current.locked && !RESIZING.active && Math.abs(g.dx) + Math.abs(g.dy) > 2,
       onPanResponderGrant: () => {
         start.current = { x: layerRef.current.x, y: layerRef.current.y };
         onDragStart();
         onSelect();
       },
       onPanResponderMove: (_e, g) => {
+        if (RESIZING.active) return; // ידית שינוי-גודל פעילה — לא להזיז את המסגרת
         const nx = Math.min(AREA_W - 8, Math.max(8, start.current.x + g.dx));
         const ny = Math.min(AREA_H - 8, Math.max(8, start.current.y + g.dy));
         onMove(nx, ny);
