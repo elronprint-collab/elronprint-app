@@ -1080,11 +1080,14 @@ export default function Studio() {
   // את הרזולוציה הטבעית שלה לצורך בדיקת איכות ההדפסה
   function fitImageBox(url: string) {
     freshImageActionRef.current = true;
+    // מילוי הקנבס לא תלוי בגודל הטבעי של התמונה — קובעים את זה מיד, לפני שממתינים ל-getSize.
+    // אם getSize נכשל בשקט (רשת/דחיסה/CORS וכו') התמונה עדיין תמלא את הקנבס נכון;
+    // getSize למטה משמש רק למידע לצורך אזהרת האיכות, לא לגודל בפועל.
+    setImg((prev) => ({ ...prev, w: AREA_W, h: AREA_H, x: AREA_W / 2, y: AREA_H / 2 }));
     RNImage.getSize(
       url,
       (w, h) => {
         setNaturalImgSize({ w, h });
-        setImg((prev) => ({ ...prev, w: AREA_W, h: AREA_H, x: AREA_W / 2, y: AREA_H / 2 }));
       },
       () => {},
     );
