@@ -1596,6 +1596,75 @@ export default function Studio() {
           </View>
         </View>
 
+        {/* תצוגה מקדימה */}
+        <View style={[st.shirtPreview, { height: AREA_H + 80, backgroundColor: shirt.hex }]}>
+          <View
+            style={[
+              st.printArea,
+              { width: AREA_W, height: AREA_H, borderColor: lightShirt ? '#00000022' : '#ffffff22' },
+            ]}
+          >
+            {localImg && (
+              <DraggableImage
+                uri={localImg}
+                img={img}
+                selected={imageSelected}
+                onSelect={() => {
+                  setImageSelected(true);
+                  setSelectedId(null);
+                }}
+                onDragStart={() => {
+                  snapshot();
+                  setScrollLocked(true);
+                }}
+                onDragEnd={() => setScrollLocked(false)}
+                onMove={(x, y) => setImg((prev) => ({ ...prev, x, y }))}
+                onResize={(patch) => setImg((prev) => ({ ...prev, ...patch }))}
+              />
+            )}
+            {!localImg && layers.length === 0 && (
+              <Text style={[st.printHint, { color: lightShirt ? '#00000066' : '#ffffff66' }]}>
+                אזור ההדפסה
+              </Text>
+            )}
+            {layers.map((l) => (
+              <DraggableText
+                key={l.id}
+                layer={l}
+                selected={l.id === selectedId}
+                onSelect={() => {
+                  setSelectedId(l.id);
+                  setImageSelected(false);
+                }}
+                onDragStart={() => {
+                  snapshot();
+                  setScrollLocked(true);
+                }}
+                onDragEnd={() => setScrollLocked(false)}
+                onMove={(x, y) => setLayers((ls) => ls.map((li) => (li.id === l.id ? { ...li, x, y } : li)))}
+                onResize={(patch) => setLayers((ls) => ls.map((li) => (li.id === l.id ? { ...li, ...patch } : li)))}
+                onMeasured={(w, h) => {
+                  layerSizeRef.current[l.id] = { w, h };
+                }}
+              />
+            ))}
+          </View>
+          {uploading && (
+            <View style={st.uploadOverlay}>
+              <ActivityIndicator color={C.accent} size="large" />
+              <Text style={st.uploadText}>מעלה את העיצוב…</Text>
+            </View>
+          )}
+          <Pressable style={st.zoomBtn} onPress={() => setZoomOpen(true)} hitSlop={8}>
+            <Text style={st.zoomBtnText}>⛶</Text>
+          </Pressable>
+          {localImg && !uploading && (
+            <Pressable style={st.removeImgBtn} onPress={removeImage} hitSlop={8}>
+              <Text style={st.removeImgText}>✕</Text>
+            </Pressable>
+          )}
+        </View>
+
         {/* סרגל כלים קטן לתמונה — מופיע כשהתמונה נבחרת */}
         {imageSelected && localImg && (
           <View style={st.toolbarWrap}>
@@ -2158,74 +2227,6 @@ export default function Studio() {
           </View>
         )}
 
-        {/* תצוגה מקדימה */}
-        <View style={[st.shirtPreview, { height: AREA_H + 80, backgroundColor: shirt.hex }]}>
-          <View
-            style={[
-              st.printArea,
-              { width: AREA_W, height: AREA_H, borderColor: lightShirt ? '#00000022' : '#ffffff22' },
-            ]}
-          >
-            {localImg && (
-              <DraggableImage
-                uri={localImg}
-                img={img}
-                selected={imageSelected}
-                onSelect={() => {
-                  setImageSelected(true);
-                  setSelectedId(null);
-                }}
-                onDragStart={() => {
-                  snapshot();
-                  setScrollLocked(true);
-                }}
-                onDragEnd={() => setScrollLocked(false)}
-                onMove={(x, y) => setImg((prev) => ({ ...prev, x, y }))}
-                onResize={(patch) => setImg((prev) => ({ ...prev, ...patch }))}
-              />
-            )}
-            {!localImg && layers.length === 0 && (
-              <Text style={[st.printHint, { color: lightShirt ? '#00000066' : '#ffffff66' }]}>
-                אזור ההדפסה
-              </Text>
-            )}
-            {layers.map((l) => (
-              <DraggableText
-                key={l.id}
-                layer={l}
-                selected={l.id === selectedId}
-                onSelect={() => {
-                  setSelectedId(l.id);
-                  setImageSelected(false);
-                }}
-                onDragStart={() => {
-                  snapshot();
-                  setScrollLocked(true);
-                }}
-                onDragEnd={() => setScrollLocked(false)}
-                onMove={(x, y) => setLayers((ls) => ls.map((li) => (li.id === l.id ? { ...li, x, y } : li)))}
-                onResize={(patch) => setLayers((ls) => ls.map((li) => (li.id === l.id ? { ...li, ...patch } : li)))}
-                onMeasured={(w, h) => {
-                  layerSizeRef.current[l.id] = { w, h };
-                }}
-              />
-            ))}
-          </View>
-          {uploading && (
-            <View style={st.uploadOverlay}>
-              <ActivityIndicator color={C.accent} size="large" />
-              <Text style={st.uploadText}>מעלה את העיצוב…</Text>
-            </View>
-          )}
-          <Pressable style={st.zoomBtn} onPress={() => setZoomOpen(true)} hitSlop={8}>
-            <Text style={st.zoomBtnText}>⛶</Text>
-          </Pressable>
-          {localImg && !uploading && (
-            <Pressable style={st.removeImgBtn} onPress={removeImage} hitSlop={8}>
-              <Text style={st.removeImgText}>✕</Text>
-            </Pressable>
-          )}
-        </View>
         {layers.length > 0 && <Text style={st.dragHint}>גררו את הטקסט למיקום הרצוי · הקישו לבחירה</Text>}
         {cloudUrl && !uploading && <Text style={st.okText}>✓ העיצוב נשמר בענן</Text>}
 
