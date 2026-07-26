@@ -2709,11 +2709,11 @@ const st = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: R.full,
-    backgroundColor: '#000000aa',
+    backgroundColor: C.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  zoomBtnText: { fontSize: 17 },
+  zoomBtnText: { fontSize: 17, color: C.onAccent },
   removeImgBtn: {
     position: 'absolute',
     top: 10,
