@@ -937,8 +937,12 @@ function DraggableText({
               style={[
                 st.resizeHandleHit,
                 {
-                  left: (leftPct / 100) * measured.w - HIT / 2,
-                  top: (topPct / 100) * measured.h - HIT / 2,
+                  width: HIT,
+                  height: HIT,
+                  zIndex: 999,
+                  elevation: 999,
+                  left: (leftPct / 100) * (layer.width ?? measured.w) - HIT / 2,
+                  top: (topPct / 100) * (layer.height ?? measured.h) - HIT / 2,
                 },
               ]}
             >
