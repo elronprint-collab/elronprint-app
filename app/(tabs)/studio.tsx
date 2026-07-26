@@ -593,14 +593,15 @@ function DraggableImage({
         source={{ uri }}
         style={[
           st.printImg,
-          img.cropScale !== 1 || img.cropOffsetX !== 0 || img.cropOffsetY !== 0
-            ? {
-                width: `${img.cropScale * 100}%` as any,
-                height: `${img.cropScale * 100}%` as any,
-                left: img.cropOffsetX,
-                top: img.cropOffsetY,
-              }
-            : null,
+          {
+            // מידות מפורשות בפיקסלים (לא אחוזים) — יחסית לתיבה עצמה (img.w/img.h), שכבר
+            // שווה בדיוק לאזור ההדפסה. אחוזים (100%) לא תמיד נפתרים נכון לגובה בכל הפלטפורמות/ה-web,
+            // וזה גרם למילוי לרוחב לעבוד אבל לא לגובה.
+            width: img.w * img.cropScale,
+            height: img.h * img.cropScale,
+            left: img.cropOffsetX,
+            top: img.cropOffsetY,
+          },
           // בדפדפן, גרירת עכבר על תג <img> מפעילה את "גרירת התמונה הטבעית" של הדפדפן (הצללית
           // האפורה) — זה חוטף את המשיכה ומונע מהמסגרת לזוז. draggable=false + הכיבוי הבא מונעים את זה.
           Platform.OS === 'web' ? ({ userSelect: 'none', WebkitUserDrag: 'none' } as any) : null,
@@ -2327,8 +2328,8 @@ export default function Studio() {
                       style={[
                         st.printImg,
                         {
-                          width: `${img.cropScale * 100}%` as any,
-                          height: `${img.cropScale * 100}%` as any,
+                          width: img.w * img.cropScale,
+                          height: img.h * img.cropScale,
                           left: img.cropOffsetX,
                           top: img.cropOffsetY,
                         },
