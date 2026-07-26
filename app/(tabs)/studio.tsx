@@ -696,6 +696,51 @@ function newLayer(): Layer {
   };
 }
 
+// גרירת עכבר להזזת כל התיבה (לא שינוי גודל) — נדרש רק בדפדפן מחשב, באותו דפוס בדיוק
+// כמו הידיות עצמן. במקום להישען על PanResponder (מנגנון המגע של רקטיב-נייטיב) עבור
+// ההזזה, זה עוקף אותו לגמרי ב-web — בדיוק כמו שכבר עשינו לידיות עצמן.
+function webLayerMoveHandlers(
+  layerRef: MutableRefObject<Layer>,
+  measuredRef: MutableRefObject<{ w: number; h: number }>,
+  onMove: (x: number, y: number) => void,
+  onSelect: () => void,
+  onDragStart: () => void,
+  onDragEnd: () => void,
+) {
+  return {
+    onMouseDown: (e: any) => {
+      if (layerRef.current.locked || RESIZING.active) return;
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const base = { x: layerRef.current.x, y: layerRef.current.y };
+      let started = false;
+      const onMoveEv = (ev: MouseEvent) => {
+        if (RESIZING.active) return;
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        if (!started) {
+          if (Math.abs(dx) + Math.abs(dy) <= 2) return;
+          started = true;
+          onDragStart();
+          onSelect();
+        }
+        const halfW = (layerRef.current.width ?? measuredRef.current.w) / 2;
+        const halfH = (layerRef.current.height ?? measuredRef.current.h) / 2;
+        const nx = clamp(base.x + dx, halfW, AREA_W - halfW);
+        const ny = clamp(base.y + dy, halfH, AREA_H - halfH);
+        onMove(nx, ny);
+      };
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMoveEv);
+        window.removeEventListener('mouseup', onUp);
+        if (started) onDragEnd();
+      };
+      window.addEventListener('mousemove', onMoveEv);
+      window.addEventListener('mouseup', onUp);
+    },
+  };
+}
+
 // גרירת עכבר לידיות ההגדלה — נדרש רק בדפדפן מחשב (PanResponder של רקטיב-נייטיב מיועד למגע)
 function webHandleHandlers(
   kind: HandleKind,
@@ -859,7 +904,9 @@ function DraggableText({
 
   return (
     <View
-      {...pan.panHandlers}
+      {...(Platform.OS === 'web'
+        ? webLayerMoveHandlers(layerRef, measuredRef, onMove, onSelect, onDragStart, onDragEnd)
+        : pan.panHandlers)}
       onLayout={(e) => {
         const next = { w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height };
         measuredRef.current = next;
@@ -885,6 +932,7 @@ function DraggableText({
           ],
         },
         selected && st.layerSelected,
+        Platform.OS === 'web' ? ({ touchAction: 'none' } as any) : null,
       ]}
     >
       {/*
@@ -958,6 +1006,9 @@ function DraggableText({
                   left: (leftPct / 100) * (layer.width ?? measured.w) - HIT / 2,
                   top: (topPct / 100) * (layer.height ?? measured.h) - HIT / 2,
                 },
+                // מונע מהדפדפן לפרש גרירה בטאצ'פד/מגע על הידית כמחוות גלילה/החלקה של הדף —
+                // בלעדיו, גרירה אנכית עלולה "להתחרות" עם גלילת הדף במקום להזיז/לשנות גודל
+                Platform.OS === 'web' ? ({ touchAction: 'none' } as any) : null,
               ]}
             >
               <View style={shape} />
@@ -2578,7 +2629,7 @@ const st = StyleSheet.create({
   },
   printImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   printHint: { fontSize: 14, fontWeight: '600' },
-  layerWrap: { position: 'absolute', padding: 4 },
+  layerWrap: { position: 'absolute' },
   textInner: { flex: 1, justifyContent: 'center' },
   layerSelected: { borderWidth: 1, borderColor: C.accent, borderStyle: 'dashed', borderRadius: 4 },
   imgSelectedBorder: {
