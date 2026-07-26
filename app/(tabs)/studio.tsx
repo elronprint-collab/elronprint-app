@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -1019,6 +1019,51 @@ function DraggableText({
   );
 }
 
+// פאנל הקשר משותף — פאנל צד קבוע מימין בדסקטופ, גיליון תחתון (bottom sheet) בנייד.
+// זה הבסיס למעבר ההדרגתי של פאנלי הכלים לפריסה הזו (מתחילים עם צבע טקסט).
+function ContextPanel({
+  visible,
+  onClose,
+  title,
+  isDesktop,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  isDesktop: boolean;
+  children: ReactNode;
+}) {
+  if (isDesktop) {
+    if (!visible) return null;
+    return (
+      <View style={st.sidePanelDesktop}>
+        <View style={st.sidePanelHeader}>
+          <Pressable onPress={onClose} hitSlop={8}>
+            <Text style={st.sidePanelClose}>✕</Text>
+          </Pressable>
+          <Text style={st.sidePanelTitle}>{title}</Text>
+        </View>
+        <ScrollView contentContainerStyle={st.sidePanelBody}>{children}</ScrollView>
+      </View>
+    );
+  }
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={st.bottomSheetBackdrop} onPress={onClose} />
+      <View style={st.bottomSheetPanel}>
+        <View style={st.sidePanelHeader}>
+          <Pressable onPress={onClose} hitSlop={8}>
+            <Text style={st.sidePanelClose}>✕</Text>
+          </Pressable>
+          <Text style={st.sidePanelTitle}>{title}</Text>
+        </View>
+        <ScrollView contentContainerStyle={st.sidePanelBody}>{children}</ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
 export default function Studio() {
   const { width: winWidth } = useWindowDimensions();
   const isDesktop = winWidth >= 900;
@@ -1571,7 +1616,9 @@ export default function Studio() {
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
+      <View style={{ flex: 1, flexDirection: isDesktop ? 'row' : 'column' }}>
       <ScrollView
+        style={isDesktop ? { flex: 1 } : undefined}
         contentContainerStyle={st.scroll}
         keyboardShouldPersistTaps="handled"
         scrollEnabled={!scrollLocked}
@@ -2189,24 +2236,6 @@ export default function Studio() {
               </ScrollView>
             )}
 
-            {openPanel === 'color' && (
-              <View>
-                <ScrollView style={st.paletteScroll} nestedScrollEnabled showsVerticalScrollIndicator>
-                  {PALETTE_GRID.map((row, ri) => (
-                    <View style={st.row} key={ri}>
-                      {row.map((c, ci) => (
-                        <Pressable
-                          key={c + ci}
-                          onPress={() => updateSelected({ color: c })}
-                          style={[st.swatchSm, { backgroundColor: c }, selected.color === c && st.swatchActive]}
-                        />
-                      ))}
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
             {openPanel === 'highlight' && (
               <View style={st.row}>
                 {HIGHLIGHTS.map((h) => (
@@ -2396,6 +2425,30 @@ export default function Studio() {
           {ordering ? <ActivityIndicator color={C.onAccent} /> : <Text style={st.nextBtnText}>המשך להזמנה ←</Text>}
         </Pressable>
       </ScrollView>
+
+      <ContextPanel
+        visible={openPanel === 'color' && !!selected}
+        onClose={() => setOpenPanel(null)}
+        title="צבע טקסט"
+        isDesktop={isDesktop}
+      >
+        {selected && (
+          <View>
+            {PALETTE_GRID.map((row, ri) => (
+              <View style={st.row} key={ri}>
+                {row.map((c, ci) => (
+                  <Pressable
+                    key={c + ci}
+                    onPress={() => updateSelected({ color: c })}
+                    style={[st.swatchSm, { backgroundColor: c }, selected.color === c && st.swatchActive]}
+                  />
+                ))}
+              </View>
+            ))}
+          </View>
+        )}
+      </ContextPanel>
+      </View>
 
       {/* תצוגה מוגדלת */}
       <Modal visible={zoomOpen} transparent animationType="fade" onRequestClose={() => setZoomOpen(false)}>
@@ -2729,6 +2782,36 @@ const st = StyleSheet.create({
     overflow: 'hidden',
   },
   zoomHint: { color: C.textDim, fontSize: 13, marginTop: S.md },
+  sidePanelDesktop: {
+    width: 280,
+    borderLeftWidth: 1,
+    borderLeftColor: C.border,
+    backgroundColor: C.bg,
+  },
+  sidePanelHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: S.md,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  sidePanelTitle: { color: C.text, fontSize: 16, fontWeight: '800' },
+  sidePanelClose: { color: C.textDim, fontSize: 20, fontWeight: '800' },
+  sidePanelBody: { padding: S.md },
+  bottomSheetBackdrop: { flex: 1, backgroundColor: '#000000aa' },
+  bottomSheetPanel: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    maxHeight: '70%',
+    backgroundColor: C.bg,
+    borderTopLeftRadius: R.lg,
+    borderTopRightRadius: R.lg,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
   graphicsBackdrop: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
   graphicsSheet: {
     backgroundColor: C.bg,
