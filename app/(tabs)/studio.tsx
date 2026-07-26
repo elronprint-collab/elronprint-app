@@ -969,6 +969,9 @@ export default function Studio() {
   // שמירה אוטומטית מקומית — טוענים טיוטה שמורה בכניסה לסטודיו (למקרה שיצאו בטעות), ושומרים
   // אותה מחדש בכל שינוי, כדי שהעיצוב לא ילך לאיבוד. נשמר רק על המכשיר, לא בענן.
   const draftLoaded = useRef(false);
+  // דגל: האם המשתמש כבר העלה/החליף תמונה חדשה בסשן הנוכחי — אם כן, שחזור הטיוטה (למטה,
+  // אסינכרוני ולפעמים איטי יותר מהעלאת תמונה) לא ידרוס אותה בערכים ישנים ששמורים מקודם.
+  const freshImageActionRef = useRef(false);
   useEffect(() => {
     AsyncStorage.getItem(DRAFT_KEY)
       .then((raw) => {
@@ -984,18 +987,20 @@ export default function Studio() {
           const maxId = Math.max(0, ...d.layers.map((l: Layer) => l.id));
           nextId = Math.max(nextId, maxId + 1);
         }
-        if (d.localImg) setLocalImg(d.localImg);
-        if (d.cloudUrl) setCloudUrl(d.cloudUrl);
-        else if (d.localImg) {
-          // התמונה נשמרה מקומית אבל ההעלאה לענן לא הושלמה (למשל אם היישום נסגר באמצע) —
-          // מנסים להעלות שוב ברקע כדי שאפשר יהיה להמשיך להזמנה בלי לתקוע את המשתמש
-          setUploading(true);
-          uploadImage(d.localImg)
-            .then((url) => setCloudUrl(url))
-            .catch(() => {})
-            .finally(() => setUploading(false));
+        if (d.localImg && !freshImageActionRef.current) setLocalImg(d.localImg);
+        if (!freshImageActionRef.current) {
+          if (d.cloudUrl) setCloudUrl(d.cloudUrl);
+          else if (d.localImg) {
+            // התמונה נשמרה מקומית אבל ההעלאה לענן לא הושלמה (למשל אם היישום נסגר באמצע) —
+            // מנסים להעלות שוב ברקע כדי שאפשר יהיה להמשיך להזמנה בלי לתקוע את המשתמש
+            setUploading(true);
+            uploadImage(d.localImg)
+              .then((url) => setCloudUrl(url))
+              .catch(() => {})
+              .finally(() => setUploading(false));
+          }
         }
-        if (d.img) setImg({ ...DEFAULT_IMG, ...d.img });
+        if (d.img && !freshImageActionRef.current) setImg({ ...DEFAULT_IMG, ...d.img });
       })
       .catch(() => {})
       .finally(() => {
@@ -1061,6 +1066,7 @@ export default function Studio() {
   }
 
   function removeImage() {
+    freshImageActionRef.current = true;
     snapshot();
     setLocalImg(null);
     setCloudUrl(null);
@@ -1073,6 +1079,7 @@ export default function Studio() {
   // מתאים את תיבת התמונה למילוי מלוא אזור ההדפסה (התמונה "נמתחת" על כל הקנבס), וגם שומר
   // את הרזולוציה הטבעית שלה לצורך בדיקת איכות ההדפסה
   function fitImageBox(url: string) {
+    freshImageActionRef.current = true;
     RNImage.getSize(
       url,
       (w, h) => {
