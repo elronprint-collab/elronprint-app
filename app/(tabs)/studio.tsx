@@ -532,8 +532,12 @@ function DraggableImage({
       },
       onPanResponderMove: (_e, g) => {
         if (RESIZING.active) return; // ידית שינוי-גודל פעילה — לא להזיז את המסגרת
-        const nx = Math.min(AREA_W - 8, Math.max(8, start.current.x + g.dx));
-        const ny = Math.min(AREA_H - 8, Math.max(8, start.current.y + g.dy));
+        // הגבלת התזוזה לפי הגודל האמיתי של התמונה (לא מרווח קבוע) — כדי שתמונה שממלאת
+        // את כל הקנבס (ברירת המחדל החדשה) לא תיגרר אל מחוץ לאזור ההדפסה
+        const halfW = imgRef.current.w / 2;
+        const halfH = imgRef.current.h / 2;
+        const nx = clamp(start.current.x + g.dx, halfW, AREA_W - halfW);
+        const ny = clamp(start.current.y + g.dy, halfH, AREA_H - halfH);
         onMove(nx, ny);
       },
       onPanResponderTerminationRequest: () => false,
