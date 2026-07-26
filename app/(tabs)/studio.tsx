@@ -924,14 +924,14 @@ function DraggableText({
           const shape = isCorner ? st.handleCorner : isVerticalBar ? st.handleBarV : st.handleBarH;
           // בלי transform למרכוז — ב-RN באנדרואיד אזור המגע לא תמיד עוקב אחרי transform,
           // אז ממקמים בחישוב ישיר (הפינה השמאלית-עליונה של אזור המגע) כדי שהמגע יתאים בדיוק למה שרואים
-          const HIT = 34;
+          const HIT = 44;
           return (
             <View
               key={kind}
               {...(Platform.OS === 'web'
                 ? webHandleHandlers(kind, layerRef, measuredRef, onResize, onDragStart, onDragEnd)
                 : handlePanByKind[kind].panHandlers)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
               style={[
                 st.resizeHandleHit,
                 {
@@ -2558,7 +2558,7 @@ const st = StyleSheet.create({
   },
   printImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   printHint: { fontSize: 14, fontWeight: '600' },
-  layerWrap: { position: 'absolute', padding: 4, maxWidth: AREA_W - 8 },
+  layerWrap: { position: 'absolute', padding: 4 },
   layerSelected: { borderWidth: 1, borderColor: C.accent, borderStyle: 'dashed', borderRadius: 4 },
   imgSelectedBorder: {
     ...(StyleSheet.absoluteFill as object),
