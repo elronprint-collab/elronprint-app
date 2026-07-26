@@ -597,8 +597,12 @@ function DraggableImage({
                 top: img.cropOffsetY,
               }
             : null,
+          // בדפדפן, גרירת עכבר על תג <img> מפעילה את "גרירת התמונה הטבעית" של הדפדפן (הצללית
+          // האפורה) — זה חוטף את המשיכה ומונע מהמסגרת לזוז. draggable=false + הכיבוי הבא מונעים את זה.
+          Platform.OS === 'web' ? ({ userSelect: 'none', WebkitUserDrag: 'none' } as any) : null,
         ]}
         contentFit="cover"
+        {...(Platform.OS === 'web' ? ({ draggable: false } as any) : null)}
       />
       {selected && <View style={st.imgSelectedBorder} pointerEvents="none" />}
       {img.locked && selected && (
