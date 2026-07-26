@@ -2663,8 +2663,6 @@ const st = StyleSheet.create({
     borderRadius: R.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: C.border,
     overflow: 'hidden',
   },
   printArea: {
