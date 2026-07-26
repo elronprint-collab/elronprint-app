@@ -338,7 +338,7 @@ const HANDLES: { kind: HandleKind; leftPct: number; topPct: number; glyph: strin
 const MIN_TEXT_SIZE = 12;
 const MAX_TEXT_SIZE = 96;
 const MIN_BOX_WIDTH = 40;
-const MAX_BOX_WIDTH = AREA_W - 16;
+let MAX_BOX_WIDTH = AREA_W - 16;
 
 function clamp(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, v));
@@ -386,7 +386,7 @@ function computeResizePatch(
 }
 
 const MIN_IMG_SIZE = 30;
-const MAX_IMG_SIZE = AREA_W - 6;
+let MAX_IMG_SIZE = AREA_W - 6;
 
 // מחשב שינוי רוחב/גובה/מיקום לתמונה לפי כיוון הידית — פינות שומרות על יחס הממדים
 function computeImageResizePatch(
@@ -633,6 +633,7 @@ function newLayer(): Layer {
     font: FONTS[0],
     color: '#ffffff',
     size: 26,
+    width: MAX_BOX_WIDTH,
     x: AREA_W / 2,
     y: AREA_H / 2,
     rotation: 0,
@@ -915,6 +916,8 @@ export default function Studio() {
     if (Math.abs(nextW - AREA_W) > 1) {
       AREA_W = nextW;
       AREA_H = nextH;
+      MAX_BOX_WIDTH = AREA_W - 16;
+      MAX_IMG_SIZE = AREA_W - 6;
       bumpCanvas((n) => n + 1);
     }
   }, [canvasAvailWidth]);
