@@ -605,7 +605,7 @@ function DraggableImage({
           // האפורה) — זה חוטף את המשיכה ומונע מהמסגרת לזוז. draggable=false + הכיבוי הבא מונעים את זה.
           Platform.OS === 'web' ? ({ userSelect: 'none', WebkitUserDrag: 'none' } as any) : null,
         ]}
-        contentFit="cover"
+        contentFit="fill"
         {...(Platform.OS === 'web' ? ({ draggable: false } as any) : null)}
       />
       {selected && <View style={st.imgSelectedBorder} pointerEvents="none" />}
@@ -2333,7 +2333,7 @@ export default function Studio() {
                           top: img.cropOffsetY,
                         },
                       ]}
-                      contentFit="cover"
+                      contentFit="fill"
                     />
                   </View>
                 )}
