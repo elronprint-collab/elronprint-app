@@ -69,6 +69,8 @@ function MiniPreview({ design }: { design: CartDesign }) {
               left: l.x * MINI,
               top: l.y * MINI,
               width: l.width != null ? l.width * MINI : undefined,
+              height: l.height != null ? l.height * MINI : undefined,
+              justifyContent: l.height != null ? 'center' : undefined,
               opacity: l.opacity / 100,
               transform: [
                 { translateX: '-50%' as never },

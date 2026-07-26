@@ -274,6 +274,7 @@ type Layer = {
   highlight: string | null;
   spacing: number;
   width?: number; // רוחב מפורש של תיבת הטקסט — נקבע כשגוררים ידית צד/פינה
+  height?: number; // גובה מפורש של תיבת הטקסט — כשמוגדר, הטקסט ממורכז אנכית בתוכו
   locked: boolean;
   opacity: number; // 0-100
   shadow: boolean;
@@ -338,7 +339,7 @@ const HANDLES: { kind: HandleKind; leftPct: number; topPct: number; glyph: strin
 const MIN_TEXT_SIZE = 12;
 const MAX_TEXT_SIZE = 96;
 const MIN_BOX_WIDTH = 40;
-let MAX_BOX_WIDTH = AREA_W - 16;
+let MAX_BOX_WIDTH = AREA_W;
 
 function clamp(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, v));
@@ -634,6 +635,7 @@ function newLayer(): Layer {
     color: '#ffffff',
     size: 26,
     width: MAX_BOX_WIDTH,
+    height: AREA_H,
     x: AREA_W / 2,
     y: AREA_H / 2,
     rotation: 0,
@@ -819,6 +821,7 @@ function DraggableText({
       style={[
         st.layerWrap,
         layer.width != null && { width: layer.width },
+        layer.height != null && { height: layer.height, justifyContent: 'center' },
         {
           left: layer.x,
           top: layer.y,
@@ -916,7 +919,7 @@ export default function Studio() {
     if (Math.abs(nextW - AREA_W) > 1) {
       AREA_W = nextW;
       AREA_H = nextH;
-      MAX_BOX_WIDTH = AREA_W - 16;
+      MAX_BOX_WIDTH = AREA_W;
       MAX_IMG_SIZE = AREA_W - 6;
       bumpCanvas((n) => n + 1);
     }
@@ -1412,6 +1415,7 @@ export default function Studio() {
               color: l.color,
               size: l.size,
               width: l.width,
+              height: l.height,
               x: l.x,
               y: l.y,
               rotation: l.rotation,
@@ -2323,6 +2327,7 @@ export default function Studio() {
                     style={[
                       st.layerWrap,
                       l.width != null && { width: l.width },
+                      l.height != null && { height: l.height, justifyContent: 'center' },
                       {
                         left: l.x,
                         top: l.y,

@@ -7,6 +7,7 @@ export type DesignLayer = {
   color: string;
   size: number;
   width?: number;
+  height?: number;
   x: number;
   y: number;
   rotation: number;
