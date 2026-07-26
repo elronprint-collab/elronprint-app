@@ -598,7 +598,7 @@ function DraggableImage({
               }
             : null,
         ]}
-        contentFit="contain"
+        contentFit="cover"
       />
       {selected && <View style={st.imgSelectedBorder} pointerEvents="none" />}
       {img.locked && selected && (
@@ -1061,22 +1061,14 @@ export default function Studio() {
     setHasTransparency(false);
   }
 
-  // מתאים את תיבת התמונה לגודל טבעי (שומר על יחס הממדים), וגם שומר את הרזולוציה האמיתית
-  // לצורך בדיקת איכות ההדפסה
+  // מתאים את תיבת התמונה למילוי מלוא אזור ההדפסה (התמונה "נמתחת" על כל הקנבס), וגם שומר
+  // את הרזולוציה הטבעית שלה לצורך בדיקת איכות ההדפסה
   function fitImageBox(url: string) {
     RNImage.getSize(
       url,
       (w, h) => {
         setNaturalImgSize({ w, h });
-        const ratio = w / h;
-        let dw = 150;
-        let dh = dw / ratio;
-        const maxH = AREA_H - 20;
-        if (dh > maxH) {
-          dh = maxH;
-          dw = dh * ratio;
-        }
-        setImg((prev) => ({ ...prev, w: Math.round(dw), h: Math.round(dh), x: AREA_W / 2, y: AREA_H / 2 }));
+        setImg((prev) => ({ ...prev, w: AREA_W, h: AREA_H, x: AREA_W / 2, y: AREA_H / 2 }));
       },
       () => {},
     );
@@ -2333,7 +2325,7 @@ export default function Studio() {
                           top: img.cropOffsetY,
                         },
                       ]}
-                      contentFit="contain"
+                      contentFit="cover"
                     />
                   </View>
                 )}
