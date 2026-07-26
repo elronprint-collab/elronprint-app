@@ -866,12 +866,14 @@ function DraggableText({
         layer.width != null && { width: layer.width },
         layer.height != null && { height: layer.height, justifyContent: 'center' },
         {
-          left: layer.x,
-          top: layer.y,
+          // מיקום בפיקסלים ישירים (במקום transform:translate אחוזי) — אותה גישה שכבר
+          // מוכחת כעובדת נכון בתמונה; ה-transform האחוזי נחשד כמקור לבעיית הלחיצה על
+          // ידיות שינוי-הגודל שבקצוות האנכיים (למעלה/למטה), בזמן שהתמונה (שלא משתמשת
+          // ב-transform אחוזי) מעולם לא סבלה מהבעיה הזו.
+          left: layer.x - (layer.width ?? measured.w) / 2,
+          top: layer.y - (layer.height ?? measured.h) / 2,
           opacity: layer.opacity / 100,
           transform: [
-            { translateX: '-50%' as never },
-            { translateY: '-50%' as never },
             { rotate: `${layer.rotation}deg` },
             { scaleX: layer.flipH ? -1 : 1 },
             { scaleY: layer.flipV ? -1 : 1 },
