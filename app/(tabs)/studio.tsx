@@ -2152,14 +2152,14 @@ export default function Studio() {
         {cloudUrl && !uploading && <Text style={st.okText}>✓ העיצוב נשמר בענן</Text>}
 
         <View style={st.rowSpread}>
+          <Pressable style={st.addTextBtn} onPress={addLayer}>
+            <Text style={st.addTextBtnText}>+ הוספת טקסט</Text>
+          </Pressable>
           <Pressable style={st.graphicsBtn} onPress={pickImage} disabled={uploading}>
             <Text style={st.graphicsBtnText}>{localImg ? '📤 החלפת תמונה' : '📤 העלאת עיצוב'}</Text>
           </Pressable>
-          <Pressable style={st.graphicsBtn} onPress={() => setReadyDesignsOpen(true)}>
-            <Text style={st.graphicsBtnText}>✨ עיצובים מוכנים</Text>
-          </Pressable>
-          <Pressable style={st.addTextBtn} onPress={addLayer}>
-            <Text style={st.addTextBtnText}>+ הוספת טקסט</Text>
+          <Pressable style={[st.deleteBtn, !selected && st.histBtnOff]} onPress={removeSelected} disabled={!selected}>
+            <Text style={st.deleteText}>🗑 מחיקה</Text>
           </Pressable>
         </View>
 
@@ -2178,11 +2178,6 @@ export default function Studio() {
           >
             <Text style={st.arrowText}>↷</Text>
           </Pressable>
-          {selected && (
-            <Pressable style={st.deleteBtn} onPress={removeSelected}>
-              <Text style={st.deleteText}>🗑 מחיקה</Text>
-            </Pressable>
-          )}
         </View>
 
         {cloudUrl && !uploading && (
@@ -2275,13 +2270,18 @@ export default function Studio() {
           <Text style={st.hint}>בוחרים עיצוב ← לוחצים "עיצוב מחדש ✨" לקבלת גרסה ייחודית משלכם</Text>
         </>
 
-        <Pressable
-          style={[st.nextBtn, (!hasDesign && !localImg || uploading || ordering) && st.nextBtnDisabled]}
-          disabled={(!hasDesign && !localImg) || uploading || ordering}
-          onPress={continueToOrder}
-        >
-          {ordering ? <ActivityIndicator color={C.onAccent} /> : <Text style={st.nextBtnText}>המשך להזמנה ←</Text>}
-        </Pressable>
+        <View style={[st.rowSpread, { flexWrap: 'nowrap' }]}>
+          <Pressable style={st.graphicsBtn} onPress={() => setReadyDesignsOpen(true)}>
+            <Text style={st.graphicsBtnText}>✨ עיצובים מוכנים</Text>
+          </Pressable>
+          <Pressable
+            style={[st.nextBtn, { flex: 1, marginTop: 0 }, (!hasDesign && !localImg || uploading || ordering) && st.nextBtnDisabled]}
+            disabled={(!hasDesign && !localImg) || uploading || ordering}
+            onPress={continueToOrder}
+          >
+            {ordering ? <ActivityIndicator color={C.onAccent} /> : <Text style={st.nextBtnText}>המשך להזמנה ←</Text>}
+          </Pressable>
+        </View>
       </ScrollView>
 
       <ContextPanel
