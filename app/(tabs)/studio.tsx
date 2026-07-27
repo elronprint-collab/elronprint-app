@@ -1580,20 +1580,20 @@ export default function Studio() {
                 }}
               />
             ))}
+            <Pressable style={st.zoomBtn} onPress={() => setZoomOpen(true)} hitSlop={8}>
+              <Text style={st.zoomBtnText}>⛶</Text>
+            </Pressable>
+            {localImg && !uploading && (
+              <Pressable style={st.removeImgBtn} onPress={removeImage} hitSlop={8}>
+                <Text style={st.removeImgText}>✕</Text>
+              </Pressable>
+            )}
           </View>
           {uploading && (
             <View style={st.uploadOverlay}>
               <ActivityIndicator color={C.accent} size="large" />
               <Text style={st.uploadText}>מעלה את העיצוב…</Text>
             </View>
-          )}
-          <Pressable style={st.zoomBtn} onPress={() => setZoomOpen(true)} hitSlop={8}>
-            <Text style={st.zoomBtnText}>⛶</Text>
-          </Pressable>
-          {localImg && !uploading && (
-            <Pressable style={st.removeImgBtn} onPress={removeImage} hitSlop={8}>
-              <Text style={st.removeImgText}>✕</Text>
-            </Pressable>
           )}
         </View>
 
