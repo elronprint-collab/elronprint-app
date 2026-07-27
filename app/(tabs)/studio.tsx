@@ -1535,6 +1535,23 @@ export default function Studio() {
         keyboardShouldPersistTaps="handled"
         scrollEnabled={!scrollLocked}
       >
+        <View style={[st.rowSpread, { justifyContent: 'flex-start' }]}>
+          <Pressable
+            onPress={undo}
+            disabled={past.current.length === 0}
+            style={[st.arrowBtn, past.current.length === 0 && st.histBtnOff]}
+          >
+            <Text style={st.arrowText}>↶</Text>
+          </Pressable>
+          <Pressable
+            onPress={redo}
+            disabled={future.current.length === 0}
+            style={[st.arrowBtn, future.current.length === 0 && st.histBtnOff]}
+          >
+            <Text style={st.arrowText}>↷</Text>
+          </Pressable>
+        </View>
+
         {/* תצוגה מקדימה */}
         <View style={[st.shirtPreview, { height: AREA_H + 80 }]}>
           <View
@@ -2160,23 +2177,6 @@ export default function Studio() {
           </Pressable>
           <Pressable style={[st.deleteBtn, !selected && st.histBtnOff]} onPress={removeSelected} disabled={!selected}>
             <Text style={st.deleteText}>🗑 מחיקה</Text>
-          </Pressable>
-        </View>
-
-        <View style={st.rowSpread}>
-          <Pressable
-            onPress={undo}
-            disabled={past.current.length === 0}
-            style={[st.arrowBtn, past.current.length === 0 && st.histBtnOff]}
-          >
-            <Text style={st.arrowText}>↶</Text>
-          </Pressable>
-          <Pressable
-            onPress={redo}
-            disabled={future.current.length === 0}
-            style={[st.arrowBtn, future.current.length === 0 && st.histBtnOff]}
-          >
-            <Text style={st.arrowText}>↷</Text>
           </Pressable>
         </View>
 
