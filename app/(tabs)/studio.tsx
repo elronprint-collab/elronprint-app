@@ -159,6 +159,123 @@ let AREA_H = 276; // יחס 5:6 (4500×5400) — יעודכן בפועל לפי 
 // ומתעלם מהתזוזה כל עוד הוא דלוק.
 const RESIZING = { active: false };
 
+// ידית מתיחה ב-web (דסקטופ + נייד באותו קוד — Platform.OS==='web' נכון בשניהם).
+//
+// למה זה נכתב מחדש: המימוש הקודם האזין רק ל-mousedown/mousemove/mouseup. על מסך מגע
+// הדפדפן לא משדר זרם רציף של mousemove תוך כדי תנועת האצבע (לכל היותר mousedown+mouseup
+// מסונכרנים בסוף הנגיעה) — ולכן הלחיצה הראשונית נרשמה, אבל הגרירה עצמה מעולם לא עודכנה.
+// זו הסיבה שהידיות "לא זזו" בנייד.
+//
+// Pointer Events מאחדים עכבר+מגע+עט תחת ממשק אחד, ו-setPointerCapture מבטיח שכל אירועי
+// התנועה והשחרור ימשיכו להגיע לידית גם אם האצבע יוצאת מגבולותיה תוך כדי גרירה.
+// המאזינים מחוברים ישירות ל-DOM (addEventListener) ולא כ-props, כדי לעקוף לגמרי את מנגנון
+// ה-Responder של react-native-web — הוא זה שהתחרה על הגרירה במימוש הקודם.
+function WebPointerHandle({
+  onStart,
+  onMoveDelta,
+  onEnd,
+  style,
+  children,
+}: {
+  onStart: () => void;
+  onMoveDelta: (dx: number, dy: number) => void;
+  onEnd: () => void;
+  style: any;
+  children: ReactNode;
+}) {
+  const ref = useRef<any>(null);
+  const cbs = useRef({ onStart, onMoveDelta, onEnd });
+  cbs.current = { onStart, onMoveDelta, onEnd };
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || typeof node.addEventListener !== 'function') return;
+
+    let activeId: number | null = null;
+    let startX = 0;
+    let startY = 0;
+
+    const down = (e: any) => {
+      if (activeId !== null) return; // כבר גוררים — מתעלמים מאצבע שנייה
+      activeId = e.pointerId;
+      startX = e.clientX;
+      startY = e.clientY;
+      e.preventDefault();
+      e.stopPropagation();
+      // מדליק לפני ש-RNW מספיק לפתוח פאן על השכבה עצמה (pointerdown קודם ל-touchstart לפי התקן)
+      RESIZING.active = true;
+      try {
+        node.setPointerCapture(e.pointerId);
+      } catch {}
+      cbs.current.onStart();
+    };
+    const move = (e: any) => {
+      if (activeId !== e.pointerId) return;
+      e.preventDefault();
+      cbs.current.onMoveDelta(e.clientX - startX, e.clientY - startY);
+    };
+    const up = (e: any) => {
+      if (activeId !== e.pointerId) return;
+      activeId = null;
+      RESIZING.active = false;
+      try {
+        node.releasePointerCapture(e.pointerId);
+      } catch {}
+      cbs.current.onEnd();
+    };
+
+    node.addEventListener('pointerdown', down);
+    node.addEventListener('pointermove', move);
+    node.addEventListener('pointerup', up);
+    node.addEventListener('pointercancel', up);
+    return () => {
+      node.removeEventListener('pointerdown', down);
+      node.removeEventListener('pointermove', move);
+      node.removeEventListener('pointerup', up);
+      node.removeEventListener('pointercancel', up);
+      if (activeId !== null) RESIZING.active = false; // נותק באמצע גרירה — לא להשאיר דגל תקוע
+    };
+  }, []);
+
+  return (
+    <View ref={ref} style={style}>
+      {children}
+    </View>
+  );
+}
+
+// מחשב את מיקום ריבוע-המגע ואת מיקום הנקודה הנראית של ידית אחת.
+//
+// למה צריך את זה: printArea מוגדר overflow:'hidden', ושכבת ברירת המחדל נוצרת בגודל
+// הקנבס המלא (width: MAX_BOX_WIDTH, height: AREA_H) — כלומר גבולות התיבה חופפים בדיוק
+// לגבולות הקנבס. המימוש הקודם מיקם כל ריבוע מגע ממורכז על הקצה (offset שלילי של HIT/2),
+// ולכן החלק שחרג נחתך ולא היה לחיץ כלל. זה מסביר למה 6 מתוך 8 הידיות "מעולם לא נרשמו":
+// רק w/e שרדו, כי הן ממורכזות אנכית ולכן נחתכו רק בחצי האופקי ונשאר מהן שטח לחיץ.
+// הפתרון: מצמידים את ריבוע המגע פנימה כך שכולו בתוך התיבה, ומציבים את הנקודה הנראית
+// בתוכו בדיוק על הקצה — כך המראה נשמר (ואף משתפר: הנקודה כבר לא חצי-חתוכה) והמגע עובד.
+function handleGeometry(
+  leftPct: number,
+  topPct: number,
+  boxW: number,
+  boxH: number,
+  hit: number,
+  dotW: number,
+  dotH: number,
+) {
+  const left = clamp((leftPct / 100) * boxW - hit / 2, 0, Math.max(0, boxW - hit));
+  const top = clamp((topPct / 100) * boxH - hit / 2, 0, Math.max(0, boxH - hit));
+  const dotLeft = clamp((leftPct / 100) * boxW - dotW / 2 - left, 0, Math.max(0, hit - dotW));
+  const dotTop = clamp((topPct / 100) * boxH - dotH / 2 - top, 0, Math.max(0, hit - dotH));
+  return { left, top, dotLeft, dotTop };
+}
+
+function dotSize(kind: HandleKind) {
+  const isCorner = kind.length === 2;
+  const isVerticalBar = kind === 'w' || kind === 'e';
+  if (isCorner) return { w: 11, h: 11 };
+  return isVerticalBar ? { w: 8, h: 18 } : { w: 18, h: 8 };
+}
+
 type Layer = {
   id: number;
   text: string;
@@ -380,37 +497,6 @@ function useImageHandleResponder(
   ).current;
 }
 
-function webImageHandleHandlers(
-  kind: HandleKind,
-  imgRef: MutableRefObject<ImgTransform>,
-  onResize: (patch: Partial<ImgTransform>) => void,
-  onDragStart: () => void,
-  onDragEnd: () => void,
-) {
-  return {
-    onMouseDown: (e: any) => {
-      e.preventDefault?.();
-      e.stopPropagation?.();
-      RESIZING.active = true;
-      const base = { w: imgRef.current.w, h: imgRef.current.h, x: imgRef.current.x, y: imgRef.current.y };
-      const startX = e.clientX;
-      const startY = e.clientY;
-      onDragStart();
-      const onMove = (ev: MouseEvent) => {
-        onResize(computeImageResizePatch(kind, ev.clientX - startX, ev.clientY - startY, base));
-      };
-      const onUp = () => {
-        window.removeEventListener('mousemove', onMove);
-        window.removeEventListener('mouseup', onUp);
-        RESIZING.active = false;
-        onDragEnd();
-      };
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp);
-    },
-  };
-}
-
 function DraggableImage({
   uri,
   img,
@@ -432,6 +518,8 @@ function DraggableImage({
 }) {
   const start = useRef({ x: img.x, y: img.y });
   const imgRef = useRef(img);
+  // ערכי הבסיס נלכדים ברגע תחילת הגרירה של ידית, וכל התזוזה מחושבת יחסית אליהם
+  const imgHandleBase = useRef({ w: 0, h: 0, x: 0, y: 0 });
   imgRef.current = img;
 
   const pan = useRef(
@@ -536,22 +624,45 @@ function DraggableImage({
           const isVerticalBar = kind === 'w' || kind === 'e';
           const shape = isCorner ? st.handleCorner : isVerticalBar ? st.handleBarV : st.handleBarH;
           const HIT = 34;
+          const dot = dotSize(kind);
+          const geo = handleGeometry(leftPct, topPct, img.w, img.h, HIT, dot.w, dot.h);
+          const hitStyle = [
+            st.resizeHandleHit,
+            { width: HIT, height: HIT, left: geo.left, top: geo.top },
+            // היה חסר כאן לגמרי — בלעדיו הדפדפן בנייד "בולע" את הגרירה האנכית כגלילת דף
+            Platform.OS === 'web' ? ({ touchAction: 'none' } as any) : null,
+          ];
+          const dotView = <View style={[shape, { position: 'absolute', left: geo.dotLeft, top: geo.dotTop }]} />;
+
+          if (Platform.OS === 'web') {
+            return (
+              <WebPointerHandle
+                key={kind}
+                style={hitStyle}
+                onStart={() => {
+                  imgHandleBase.current = {
+                    w: imgRef.current.w,
+                    h: imgRef.current.h,
+                    x: imgRef.current.x,
+                    y: imgRef.current.y,
+                  };
+                  onDragStart();
+                }}
+                onMoveDelta={(dx, dy) => onResize(computeImageResizePatch(kind, dx, dy, imgHandleBase.current))}
+                onEnd={onDragEnd}
+              >
+                {dotView}
+              </WebPointerHandle>
+            );
+          }
           return (
             <View
               key={kind}
-              {...(Platform.OS === 'web'
-                ? webImageHandleHandlers(kind, imgRef, onResize, onDragStart, onDragEnd)
-                : handlePanByKind[kind].panHandlers)}
+              {...handlePanByKind[kind].panHandlers}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={[
-                st.resizeHandleHit,
-                {
-                  left: (leftPct / 100) * img.w - HIT / 2,
-                  top: (topPct / 100) * img.h - HIT / 2,
-                },
-              ]}
+              style={hitStyle}
             >
-              <View style={shape} />
+              {dotView}
             </View>
           );
         })}
@@ -638,42 +749,6 @@ function webLayerMoveHandlers(
 }
 
 // גרירת עכבר לידיות ההגדלה — נדרש רק בדפדפן מחשב (PanResponder של רקטיב-נייטיב מיועד למגע)
-function webHandleHandlers(
-  kind: HandleKind,
-  layerRef: MutableRefObject<Layer>,
-  measuredRef: MutableRefObject<{ w: number; h: number }>,
-  onResize: (patch: Partial<Layer>) => void,
-  onDragStart: () => void,
-  onDragEnd: () => void,
-) {
-  return {
-    onMouseDown: (e: any) => {
-      e.preventDefault?.();
-      e.stopPropagation?.();
-      RESIZING.active = true;
-      const base = {
-        size: layerRef.current.size,
-        width: layerRef.current.width ?? measuredRef.current.w,
-        x: layerRef.current.x,
-      };
-      const startX = e.clientX;
-      const startY = e.clientY;
-      onDragStart();
-      const onMove = (ev: MouseEvent) => {
-        onResize(computeResizePatch(kind, ev.clientX - startX, ev.clientY - startY, base));
-      };
-      const onUp = () => {
-        window.removeEventListener('mousemove', onMove);
-        window.removeEventListener('mouseup', onUp);
-        RESIZING.active = false;
-        onDragEnd();
-      };
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp);
-    },
-  };
-}
-
 function useHandleResponder(
   kind: HandleKind,
   layerRef: MutableRefObject<Layer>,
@@ -731,6 +806,8 @@ function DraggableText({
   const layerRef = useRef(layer);
   layerRef.current = layer;
   const measuredRef = useRef({ w: 100, h: 30 });
+  // ערכי הבסיס נלכדים ברגע תחילת הגרירה של ידית, וכל התזוזה מחושבת יחסית אליהם
+  const handleBase = useRef({ size: 0, width: 0, x: 0 });
   // מצב לרינדור מיקום הידיות בפיקסלים — נדרש בנייד: אחוזים (%) ביחס לתיבה שמתאימה עצמה
   // אוטומטית לתוכן (auto-size) לא נפתרים באופן אמין ב-Yoga/RN Native כמו בדפדפן,
   // ולכן שם הידיות "זזות" ולא נשארות במקום. פיקסלים מדויקים פותרים את זה בשתי הפלטפורמות.
@@ -885,29 +962,60 @@ function DraggableText({
           // בלי transform למרכוז — ב-RN באנדרואיד אזור המגע לא תמיד עוקב אחרי transform,
           // אז ממקמים בחישוב ישיר (הפינה השמאלית-עליונה של אזור המגע) כדי שהמגע יתאים בדיוק למה שרואים
           const HIT = 44;
+          const dot = dotSize(kind);
+          const geo = handleGeometry(
+            leftPct,
+            topPct,
+            layer.width ?? measured.w,
+            layer.height ?? measured.h,
+            HIT,
+            dot.w,
+            dot.h,
+          );
+          const hitStyle = [
+            st.resizeHandleHit,
+            {
+              width: HIT,
+              height: HIT,
+              zIndex: 999,
+              elevation: 999,
+              left: geo.left,
+              top: geo.top,
+            },
+            // מונע מהדפדפן לפרש גרירה בטאצ'פד/מגע על הידית כמחוות גלילה/החלקה של הדף —
+            // בלעדיו, גרירה אנכית "מתחרה" בגלילת הדף במקום לשנות גודל (קריטי בנייד)
+            Platform.OS === 'web' ? ({ touchAction: 'none' } as any) : null,
+          ];
+          const dotView = <View style={[shape, { position: 'absolute', left: geo.dotLeft, top: geo.dotTop }]} />;
+
+          if (Platform.OS === 'web') {
+            return (
+              <WebPointerHandle
+                key={kind}
+                style={hitStyle}
+                onStart={() => {
+                  handleBase.current = {
+                    size: layerRef.current.size,
+                    width: layerRef.current.width ?? measuredRef.current.w,
+                    x: layerRef.current.x,
+                  };
+                  onDragStart();
+                }}
+                onMoveDelta={(dx, dy) => onResize(computeResizePatch(kind, dx, dy, handleBase.current))}
+                onEnd={onDragEnd}
+              >
+                {dotView}
+              </WebPointerHandle>
+            );
+          }
           return (
             <View
               key={kind}
-              {...(Platform.OS === 'web'
-                ? webHandleHandlers(kind, layerRef, measuredRef, onResize, onDragStart, onDragEnd)
-                : handlePanByKind[kind].panHandlers)}
+              {...handlePanByKind[kind].panHandlers}
               hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-              style={[
-                st.resizeHandleHit,
-                {
-                  width: HIT,
-                  height: HIT,
-                  zIndex: 999,
-                  elevation: 999,
-                  left: (leftPct / 100) * (layer.width ?? measured.w) - HIT / 2,
-                  top: (topPct / 100) * (layer.height ?? measured.h) - HIT / 2,
-                },
-                // מונע מהדפדפן לפרש גרירה בטאצ'פד/מגע על הידית כמחוות גלילה/החלקה של הדף —
-                // בלעדיו, גרירה אנכית עלולה "להתחרות" עם גלילת הדף במקום להזיז/לשנות גודל
-                Platform.OS === 'web' ? ({ touchAction: 'none' } as any) : null,
-              ]}
+              style={hitStyle}
             >
-              <View style={shape} />
+              {dotView}
             </View>
           );
         })}
