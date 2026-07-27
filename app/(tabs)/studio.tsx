@@ -741,48 +741,6 @@ function newLayer(): Layer {
 // גרירת עכבר להזזת כל התיבה (לא שינוי גודל) — נדרש רק בדפדפן מחשב, באותו דפוס בדיוק
 // כמו הידיות עצמן. במקום להישען על PanResponder (מנגנון המגע של רקטיב-נייטיב) עבור
 // ההזזה, זה עוקף אותו לגמרי ב-web — בדיוק כמו שכבר עשינו לידיות עצמן.
-function webLayerMoveHandlers(
-  layerRef: MutableRefObject<Layer>,
-  measuredRef: MutableRefObject<{ w: number; h: number }>,
-  onMove: (x: number, y: number) => void,
-  onSelect: () => void,
-  onDragStart: () => void,
-  onDragEnd: () => void,
-) {
-  return {
-    onMouseDown: (e: any) => {
-      if (layerRef.current.locked || RESIZING.active) return;
-      onSelect();
-      const startX = e.clientX;
-      const startY = e.clientY;
-      const base = { x: layerRef.current.x, y: layerRef.current.y };
-      let started = false;
-      const onMoveEv = (ev: MouseEvent) => {
-        if (RESIZING.active) return;
-        const dx = ev.clientX - startX;
-        const dy = ev.clientY - startY;
-        if (!started) {
-          if (Math.abs(dx) + Math.abs(dy) <= 2) return;
-          started = true;
-          onDragStart();
-        }
-        const halfW = (layerRef.current.width ?? measuredRef.current.w) / 2;
-        const halfH = (layerRef.current.height ?? measuredRef.current.h) / 2;
-        const nx = clampAxis(base.x + dx, halfW, AREA_W);
-        const ny = clampAxis(base.y + dy, halfH, AREA_H);
-        onMove(nx, ny);
-      };
-      const onUp = () => {
-        window.removeEventListener('mousemove', onMoveEv);
-        window.removeEventListener('mouseup', onUp);
-        if (started) onDragEnd();
-      };
-      window.addEventListener('mousemove', onMoveEv);
-      window.addEventListener('mouseup', onUp);
-    },
-  };
-}
-
 // גרירת עכבר לידיות ההגדלה — נדרש רק בדפדפן מחשב (PanResponder של רקטיב-נייטיב מיועד למגע)
 function useHandleResponder(
   kind: HandleKind,
@@ -845,6 +803,8 @@ function DraggableText({
   const measuredRef = useRef({ w: 100, h: 30 });
   // ערכי הבסיס נלכדים ברגע תחילת הגרירה של ידית, וכל התזוזה מחושבת יחסית אליהם
   const handleBase = useRef({ size: 0, width: 0, height: 0, x: 0, y: 0 });
+  // האם המחווה הנוכחית הפכה לגרירה אמיתית (ולא רק נגיעה לבחירה)
+  const dragMoved = useRef(false);
   // מצב לרינדור מיקום הידיות בפיקסלים — נדרש בנייד: אחוזים (%) ביחס לתיבה שמתאימה עצמה
   // אוטומטית לתוכן (auto-size) לא נפתרים באופן אמין ב-Yoga/RN Native כמו בדפדפן,
   // ולכן שם הידיות "זזות" ולא נשארות במקום. פיקסלים מדויקים פותרים את זה בשתי הפלטפורמות.
@@ -857,11 +817,17 @@ function DraggableText({
         !layerRef.current.locked && !RESIZING.active && Math.abs(g.dx) + Math.abs(g.dy) > 2,
       onPanResponderGrant: () => {
         start.current = { x: layerRef.current.x, y: layerRef.current.y };
-        onDragStart();
+        dragMoved.current = false;
+        // בחירה מיידית, אבל בלי snapshot: נגיעה בלבד לא צריכה להיכנס להיסטוריית הביטול
         onSelect();
       },
       onPanResponderMove: (_e, g) => {
         if (RESIZING.active) return; // ידית שינוי-גודל פעילה — לא להזיז את המסגרת
+        if (!dragMoved.current) {
+          if (Math.abs(g.dx) + Math.abs(g.dy) <= 2) return; // עדיין נגיעה, לא גרירה
+          dragMoved.current = true;
+          onDragStart(); // רק עכשיו: snapshot לביטול + נעילת גלילה
+        }
         // הגבלת התזוזה לפי הגודל האמיתי של התיבה (לא מרווח קבוע) — אותו תיקון שכבר
         // בוצע לתמונה, כדי שתיבת טקסט שממלאת את כל הקנבס לא תיגרר אל מחוץ לאזור ההדפסה
         const halfW = (layerRef.current.width ?? measuredRef.current.w) / 2;
@@ -914,9 +880,12 @@ function DraggableText({
 
   return (
     <View
-      {...(Platform.OS === 'web'
-        ? webLayerMoveHandlers(layerRef, measuredRef, onMove, onSelect, onDragStart, onDragEnd)
-        : pan.panHandlers)}
+      // אותו PanResponder שהתמונה משתמשת בו בכל הפלטפורמות. קודם ה-web קיבל כאן
+      // מטפל נפרד מבוסס עכבר בלבד (onMouseDown + mousemove/mouseup על window), ולכן
+      // בנייד הגרירה של הטקסט לא עבדה: אצבע על מסך מגע לא מייצרת זרם mousemove.
+      // ה-PanResponder עובד גם עם עכבר וגם עם מגע דרך מנגנון ה-Responder של RNW —
+      // בדיוק הסיבה שגרירת התמונה תמיד עבדה טוב בשתי הפלטפורמות.
+      {...pan.panHandlers}
       onLayout={(e) => {
         const next = { w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height };
         measuredRef.current = next;
