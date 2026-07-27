@@ -1535,21 +1535,24 @@ export default function Studio() {
         keyboardShouldPersistTaps="handled"
         scrollEnabled={!scrollLocked}
       >
-        <View style={[st.rowSpread, { justifyContent: 'flex-end' }]}>
-          <Pressable
-            onPress={undo}
-            disabled={past.current.length === 0}
-            style={[st.arrowBtn, past.current.length === 0 && st.histBtnOff]}
-          >
-            <Text style={st.arrowText}>↶</Text>
-          </Pressable>
-          <Pressable
-            onPress={redo}
-            disabled={future.current.length === 0}
-            style={[st.arrowBtn, future.current.length === 0 && st.histBtnOff]}
-          >
-            <Text style={st.arrowText}>↷</Text>
-          </Pressable>
+        <View style={[st.rowSpread, { justifyContent: 'space-between', alignItems: 'center' }]}>
+          <Text style={st.title}>סטודיו לעיצוב</Text>
+          <View style={{ flexDirection: 'row', gap: S.sm }}>
+            <Pressable
+              onPress={undo}
+              disabled={past.current.length === 0}
+              style={[st.arrowBtn, past.current.length === 0 && st.histBtnOff]}
+            >
+              <Text style={st.arrowText}>↶</Text>
+            </Pressable>
+            <Pressable
+              onPress={redo}
+              disabled={future.current.length === 0}
+              style={[st.arrowBtn, future.current.length === 0 && st.histBtnOff]}
+            >
+              <Text style={st.arrowText}>↷</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* תצוגה מקדימה */}
