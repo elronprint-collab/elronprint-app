@@ -1137,6 +1137,13 @@ export default function Studio() {
     setSelectedId(l.id);
   }
 
+  function removeSelected() {
+    if (selectedId == null) return;
+    snapshot();
+    setLayers((ls) => ls.filter((l) => l.id !== selectedId));
+    setSelectedId(null);
+  }
+
   function updateImg(patch: Partial<ImgTransform>, withSnapshot = true) {
     if (withSnapshot) snapshot();
     setImg((prev) => ({ ...prev, ...patch }));
@@ -2171,6 +2178,11 @@ export default function Studio() {
           >
             <Text style={st.arrowText}>↷</Text>
           </Pressable>
+          {selected && (
+            <Pressable style={st.deleteBtn} onPress={removeSelected}>
+              <Text style={st.deleteText}>🗑 מחיקה</Text>
+            </Pressable>
+          )}
         </View>
 
         {cloudUrl && !uploading && (
