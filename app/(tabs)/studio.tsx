@@ -2804,7 +2804,7 @@ const st = StyleSheet.create({
   deleteBadge: {
     position: 'absolute',
     top: 4,
-    left: 4,
+    right: 4,
     width: 22,
     height: 22,
     borderRadius: R.full,
