@@ -148,6 +148,13 @@ const ALIGNS = [
 // תיקון RTL: הסליידר מתהפך בממשק עברי, אז הופכים אותו חזרה
 const SLIDER_INVERTED = Platform.OS === 'web' ? true : I18nManager.isRTL;
 
+// עובי המסגרת המקווקוות של אזור ההדפסה. הגודל של printArea נקבע כולל המסגרת
+// (border-box), ולכן צריך להוסיף אותו לרוחב/גובה כדי שהשטח הפנימי — זה ש-overflow:'hidden'
+// חותך לפיו — יהיה בדיוק AREA_W x AREA_H, בדיוק כמו מערכת הקואורדינטות של השכבות.
+// בלי זה השטח הפנימי קטן ב-3px, ושכבה שממלאת את הקנבס (ברירת המחדל של טקסט ותמונה)
+// מתחילה ב-0,0 וחורגת 3px ימינה ולמטה — ולכן הצלע השמאלית והעליונה של המסגרת הירוקה
+// נראו, והימנית והתחתונה נחתכו ונעלמו.
+const PRINT_AREA_BORDER = 1.5;
 let AREA_W = 230;
 let AREA_H = 276; // יחס 5:6 (4500×5400) — יעודכן בפועל לפי רוחב המסך הזמין
 
@@ -1677,7 +1684,12 @@ export default function Studio() {
           <View
             style={[
               st.printArea,
-              { width: AREA_W, height: AREA_H, backgroundColor: shirt.hex, borderColor: lightShirt ? '#00000022' : '#ffffff22' },
+              {
+                width: AREA_W + PRINT_AREA_BORDER * 2,
+                height: AREA_H + PRINT_AREA_BORDER * 2,
+                backgroundColor: shirt.hex,
+                borderColor: lightShirt ? '#00000022' : '#ffffff22',
+              },
             ]}
           >
             {localImg && (
@@ -2433,7 +2445,17 @@ export default function Studio() {
         <Pressable style={st.zoomBackdrop} onPress={() => setZoomOpen(false)}>
           <View style={st.zoomShirt}>
             <View style={{ transform: [{ scale: 1.45 }] }}>
-              <View style={[st.printArea, { width: AREA_W, height: AREA_H, backgroundColor: shirt.hex, borderColor: 'transparent' }]}>
+              <View
+                  style={[
+                    st.printArea,
+                    {
+                      width: AREA_W + PRINT_AREA_BORDER * 2,
+                      height: AREA_H + PRINT_AREA_BORDER * 2,
+                      backgroundColor: shirt.hex,
+                      borderColor: 'transparent',
+                    },
+                  ]}
+                >
                 {localImg && (
                   <View
                     style={{
@@ -2611,7 +2633,7 @@ const st = StyleSheet.create({
     overflow: 'hidden',
   },
   printArea: {
-    borderWidth: 1.5,
+    borderWidth: PRINT_AREA_BORDER,
     borderStyle: 'dashed',
     borderRadius: R.sm,
     alignItems: 'center',
