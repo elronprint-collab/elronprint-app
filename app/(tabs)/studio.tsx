@@ -367,6 +367,22 @@ function clamp(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, v));
 }
 
+// הגבלת מיקום לציר אחד בגרירה של שכבה.
+//
+// הבאג שזה מתקן: הנוסחה הקודמת, clamp(v, half, AREA - half), מניחה שהתיבה קטנה
+// מהקנבס. שכבת טקסט נוצרת ברוחב וגובה הקנבס המלא, ואז half === AREA - half —
+// כלומר הגבול התחתון והעליון זהים, ו-clamp מחזיר תמיד את אותו מספר בדיוק. התוצאה:
+// התיבה "קופאת" במרכז ואי אפשר לגרור אותה בכלל. זה מסביר את ה"לפעמים נתקע":
+// אם מקטינים את התיבה עצמה (בידיות) היא נכנסת לקנבס והגרירה עובדת, אבל אם מקטינים
+// רק את גודל הפונט — התיבה נשארת בגודל הקנבס והגרירה תקועה, למרות שהטקסט קטן.
+//
+// הפתרון: כשהתיבה גדולה מהקנבס (או שווה לו) ואי אפשר להכיל אותה כולה, מגבילים רק
+// את המרכז לגבולות הקנבס במקום להקפיא. כשהתיבה כן נכנסת — התנהגות זהה לקודם.
+function clampAxis(v: number, half: number, area: number) {
+  if (half * 2 >= area) return clamp(v, 0, area);
+  return clamp(v, half, area - half);
+}
+
 // מחשב את השינוי בגודל/רוחב/גובה/מיקום לפי כיוון הידית שנגררת.
 //
 // שונה מהמימוש הקודם: קודם הידיות העליונה/תחתונה ('n'/'s') שינו רק את גודל הפונט,
@@ -752,8 +768,8 @@ function webLayerMoveHandlers(
         }
         const halfW = (layerRef.current.width ?? measuredRef.current.w) / 2;
         const halfH = (layerRef.current.height ?? measuredRef.current.h) / 2;
-        const nx = clamp(base.x + dx, halfW, AREA_W - halfW);
-        const ny = clamp(base.y + dy, halfH, AREA_H - halfH);
+        const nx = clampAxis(base.x + dx, halfW, AREA_W);
+        const ny = clampAxis(base.y + dy, halfH, AREA_H);
         onMove(nx, ny);
       };
       const onUp = () => {
@@ -850,8 +866,8 @@ function DraggableText({
         // בוצע לתמונה, כדי שתיבת טקסט שממלאת את כל הקנבס לא תיגרר אל מחוץ לאזור ההדפסה
         const halfW = (layerRef.current.width ?? measuredRef.current.w) / 2;
         const halfH = (layerRef.current.height ?? measuredRef.current.h) / 2;
-        const nx = clamp(start.current.x + g.dx, halfW, AREA_W - halfW);
-        const ny = clamp(start.current.y + g.dy, halfH, AREA_H - halfH);
+        const nx = clampAxis(start.current.x + g.dx, halfW, AREA_W);
+        const ny = clampAxis(start.current.y + g.dy, halfH, AREA_H);
         onMove(nx, ny);
       },
       onPanResponderTerminationRequest: () => false,
