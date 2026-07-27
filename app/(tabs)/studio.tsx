@@ -1535,7 +1535,7 @@ export default function Studio() {
         keyboardShouldPersistTaps="handled"
         scrollEnabled={!scrollLocked}
       >
-        <View style={[st.rowSpread, { justifyContent: 'flex-start' }]}>
+        <View style={[st.rowSpread, { justifyContent: 'flex-end' }]}>
           <Pressable
             onPress={undo}
             disabled={past.current.length === 0}
