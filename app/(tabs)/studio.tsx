@@ -578,7 +578,6 @@ function DraggableImage({
   onResize,
   onDragStart,
   onDragEnd,
-  onDelete,
 }: {
   uri: string;
   img: ImgTransform;
@@ -588,7 +587,6 @@ function DraggableImage({
   onResize: (patch: Partial<ImgTransform>) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
-  onDelete: () => void;
 }) {
   const start = useRef({ x: img.x, y: img.y });
   const imgRef = useRef(img);
@@ -689,9 +687,6 @@ function DraggableImage({
           <Text style={st.lockBadgeText}>🔒</Text>
         </View>
       )}
-      <Pressable style={st.deleteBadge} onPress={onDelete} hitSlop={8}>
-        <Text style={st.deleteBadgeText}>🗑</Text>
-      </Pressable>
       {selected &&
         !img.locked &&
         HANDLES.map(({ kind, leftPct, topPct }) => {
@@ -880,7 +875,6 @@ function DraggableText({
   onDragStart,
   onDragEnd,
   onMeasured,
-  onDelete,
 }: {
   layer: Layer;
   selected: boolean;
@@ -890,7 +884,6 @@ function DraggableText({
   onDragStart: () => void;
   onDragEnd: () => void;
   onMeasured?: (w: number, h: number) => void;
-  onDelete: () => void;
 }) {
   const start = useRef({ x: layer.x, y: layer.y });
   const layerRef = useRef(layer);
@@ -1042,9 +1035,6 @@ function DraggableText({
           <Text style={st.lockBadgeText}>🔒</Text>
         </View>
       )}
-      <Pressable style={st.deleteBadge} onPress={onDelete} hitSlop={8}>
-        <Text style={st.deleteBadgeText}>🗑</Text>
-      </Pressable>
       {canEditHandles &&
         HANDLES.map(({ kind, leftPct, topPct }) => {
           const isCorner = kind.length === 2;
@@ -1303,12 +1293,6 @@ export default function Studio() {
     const l = newLayer();
     setLayers((ls) => [...ls, l]);
     setSelectedId(l.id);
-  }
-
-  function removeLayerById(id: number) {
-    snapshot();
-    setLayers((ls) => ls.filter((l) => l.id !== id));
-    if (selectedId === id) setSelectedId(null);
   }
 
   function updateImg(patch: Partial<ImgTransform>, withSnapshot = true) {
@@ -1735,7 +1719,6 @@ export default function Studio() {
                 onDragEnd={() => setScrollLocked(false)}
                 onMove={(x, y) => setImg((prev) => ({ ...prev, x, y }))}
                 onResize={(patch) => setImg((prev) => ({ ...prev, ...patch }))}
-                onDelete={removeImage}
               />
             )}
             {!localImg && layers.length === 0 && (
@@ -1762,7 +1745,6 @@ export default function Studio() {
                 onMeasured={(w, h) => {
                   layerSizeRef.current[l.id] = { w, h };
                 }}
-                onDelete={() => removeLayerById(l.id)}
               />
             ))}
           </View>
@@ -2801,20 +2783,6 @@ const st = StyleSheet.create({
     justifyContent: 'center',
   },
   lockBadgeText: { fontSize: 11 },
-  deleteBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 22,
-    height: 22,
-    borderRadius: R.full,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteBadgeText: { fontSize: 11 },
   dragHint: { color: C.textDim, fontSize: 12, textAlign: 'center', marginTop: 6 },
   zoomBtn: {
     position: 'absolute',
