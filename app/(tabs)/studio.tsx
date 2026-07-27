@@ -86,164 +86,6 @@ const PALETTE_GRID: string[][] = [PALETTE_GRAY, ...PALETTE_HUES.map((h) => build
 
 const HIGHLIGHTS: (string | null)[] = [null, '#000000', '#ffffff', '#00fc25', '#ffd400', '#ff3b6b'];
 
-type Graphic = { char: string; keywords: string[] };
-type GraphicCategory = { name: string; items: Graphic[] };
-
-const GRAPHIC_CATEGORIES: GraphicCategory[] = [
-  {
-    name: 'מועדפים',
-    items: [
-      { char: '❤️', keywords: ['לב', 'אהבה'] },
-      { char: '⚡', keywords: ['ברק', 'חשמל'] },
-      { char: '👑', keywords: ['כתר'] },
-      { char: '⭐', keywords: ['כוכב'] },
-      { char: '🔥', keywords: ['אש'] },
-      { char: '😎', keywords: ['משקפי שמש', 'מגניב'] },
-      { char: '🎉', keywords: ['מסיבה', 'חגיגה'] },
-      { char: '🦄', keywords: ['חד קרן'] },
-      { char: '⚽', keywords: ['כדורגל'] },
-      { char: '🎸', keywords: ['גיטרה'] },
-      { char: '💪', keywords: ['שריר', 'כוח'] },
-      { char: '🌈', keywords: ['קשת'] },
-    ],
-  },
-  {
-    name: 'פרחים וטבע',
-    items: [
-      { char: '🌸', keywords: ['פרח', 'ורוד'] },
-      { char: '🌺', keywords: ['פרח', 'היביסקוס'] },
-      { char: '🌻', keywords: ['פרח', 'חמנייה'] },
-      { char: '🌼', keywords: ['פרח', 'חינניות'] },
-      { char: '🌷', keywords: ['פרח', 'צבעוני'] },
-      { char: '🌹', keywords: ['פרח', 'ורד'] },
-      { char: '🍀', keywords: ['תלתן', 'מזל'] },
-      { char: '🌳', keywords: ['עץ'] },
-      { char: '🌲', keywords: ['עץ', 'אורן'] },
-      { char: '🌴', keywords: ['דקל'] },
-      { char: '🍁', keywords: ['עלה', 'סתיו'] },
-      { char: '🌵', keywords: ['קקטוס'] },
-      { char: '🌊', keywords: ['ים', 'גל'] },
-      { char: '☀️', keywords: ['שמש'] },
-    ],
-  },
-  {
-    name: 'בעלי חיים',
-    items: [
-      { char: '🐶', keywords: ['כלב'] },
-      { char: '🐱', keywords: ['חתול'] },
-      { char: '🐰', keywords: ['ארנב'] },
-      { char: '🐻', keywords: ['דוב'] },
-      { char: '🦁', keywords: ['אריה'] },
-      { char: '🐯', keywords: ['נמר'] },
-      { char: '🐨', keywords: ['קואלה'] },
-      { char: '🐼', keywords: ['פנדה'] },
-      { char: '🦊', keywords: ['שועל'] },
-      { char: '🐸', keywords: ['צפרדע'] },
-      { char: '🦄', keywords: ['חד קרן'] },
-      { char: '🐝', keywords: ['דבורה'] },
-      { char: '🦋', keywords: ['פרפר'] },
-      { char: '🐬', keywords: ['דולפין'] },
-      { char: '🦉', keywords: ['ינשוף'] },
-      { char: '🐢', keywords: ['צב'] },
-    ],
-  },
-  {
-    name: 'אוכל ומשקאות',
-    items: [
-      { char: '🍕', keywords: ['פיצה'] },
-      { char: '🍔', keywords: ['המבורגר'] },
-      { char: '🍟', keywords: ['צ׳יפס'] },
-      { char: '🌮', keywords: ['טאקו'] },
-      { char: '🍩', keywords: ['דונאט', 'סופגנייה'] },
-      { char: '🍪', keywords: ['עוגייה'] },
-      { char: '🎂', keywords: ['עוגה', 'יום הולדת'] },
-      { char: '🍦', keywords: ['גלידה'] },
-      { char: '🍰', keywords: ['עוגה'] },
-      { char: '🍫', keywords: ['שוקולד'] },
-      { char: '🍿', keywords: ['פופקורן'] },
-      { char: '🥤', keywords: ['שתייה'] },
-      { char: '☕', keywords: ['קפה'] },
-      { char: '🍺', keywords: ['בירה'] },
-    ],
-  },
-  {
-    name: 'מסיבות ואירועים',
-    items: [
-      { char: '🎉', keywords: ['מסיבה', 'חגיגה'] },
-      { char: '🎊', keywords: ['קונפטי'] },
-      { char: '🎈', keywords: ['בלון'] },
-      { char: '🎁', keywords: ['מתנה'] },
-      { char: '🎀', keywords: ['סרט'] },
-      { char: '🥳', keywords: ['חגיגה'] },
-      { char: '🎆', keywords: ['זיקוקים'] },
-      { char: '🎇', keywords: ['זיקוקים'] },
-      { char: '🍾', keywords: ['שמפניה'] },
-      { char: '🥂', keywords: ['כוסות', 'לחיים'] },
-    ],
-  },
-  {
-    name: 'ספורט',
-    items: [
-      { char: '⚽', keywords: ['כדורגל'] },
-      { char: '🏀', keywords: ['כדורסל'] },
-      { char: '🏈', keywords: ['פוטבול'] },
-      { char: '⚾', keywords: ['בייסבול'] },
-      { char: '🎾', keywords: ['טניס'] },
-      { char: '🏐', keywords: ['כדורעף'] },
-      { char: '🏓', keywords: ['טניס שולחן'] },
-      { char: '🥊', keywords: ['אגרוף'] },
-      { char: '🏆', keywords: ['גביע', 'ניצחון'] },
-      { char: '🥇', keywords: ['מדליה', 'זהב'] },
-    ],
-  },
-  {
-    name: 'סמלים ולבבות',
-    items: [
-      { char: '❤️', keywords: ['לב', 'אהבה', 'אדום'] },
-      { char: '💛', keywords: ['לב', 'צהוב'] },
-      { char: '💚', keywords: ['לב', 'ירוק'] },
-      { char: '💙', keywords: ['לב', 'כחול'] },
-      { char: '💜', keywords: ['לב', 'סגול'] },
-      { char: '🖤', keywords: ['לב', 'שחור'] },
-      { char: '🤍', keywords: ['לב', 'לבן'] },
-      { char: '💔', keywords: ['לב שבור'] },
-      { char: '✨', keywords: ['נצנצים'] },
-      { char: '⭐', keywords: ['כוכב'] },
-      { char: '🌟', keywords: ['כוכב', 'זוהר'] },
-      { char: '🔥', keywords: ['אש'] },
-    ],
-  },
-  {
-    name: 'תחבורה',
-    items: [
-      { char: '🚗', keywords: ['מכונית'] },
-      { char: '🚕', keywords: ['מונית'] },
-      { char: '🚌', keywords: ['אוטובוס'] },
-      { char: '🚑', keywords: ['אמבולנס'] },
-      { char: '🚒', keywords: ['כבאית'] },
-      { char: '🚀', keywords: ['רקטה', 'חלל'] },
-      { char: '✈️', keywords: ['מטוס'] },
-      { char: '🚁', keywords: ['מסוק'] },
-      { char: '⛵', keywords: ['סירה'] },
-      { char: '🚲', keywords: ['אופניים'] },
-      { char: '🏍️', keywords: ['אופנוע'] },
-    ],
-  },
-  {
-    name: 'מזג אוויר',
-    items: [
-      { char: '🌤️', keywords: ['שמש', 'עננים'] },
-      { char: '⛅', keywords: ['עננים'] },
-      { char: '🌧️', keywords: ['גשם'] },
-      { char: '⛈️', keywords: ['סופה', 'רעם'] },
-      { char: '❄️', keywords: ['שלג'] },
-      { char: '🌈', keywords: ['קשת'] },
-      { char: '☔', keywords: ['מטריה'] },
-      { char: '🌙', keywords: ['ירח'] },
-    ],
-  },
-];
-
 type ReadyDesign = { slug: string; label: string; source: number | string };
 
 const READY_DESIGNS: ReadyDesign[] = [
@@ -1404,9 +1246,7 @@ export default function Studio() {
     { key: 'dashed', label: '- -' },
     { key: 'solid', label: '—' },
   ];
-  const [graphicsOpen, setGraphicsOpen] = useState(false);
   const [readyDesignsOpen, setReadyDesignsOpen] = useState(false);
-  const [graphicsQuery, setGraphicsQuery] = useState('');
   const [zoomOpen, setZoomOpen] = useState(false);
 
   useEffect(() => {
@@ -1416,13 +1256,6 @@ export default function Studio() {
         .catch(() => {});
     }
   }, []);
-
-  function addSymbol(char: string) {
-    snapshot();
-    const l = { ...newLayer(), text: char, size: 42 };
-    setLayers((ls) => [...ls, l]);
-    setSelectedId(l.id);
-  }
 
   async function useTemplate(p: Product) {
     if (!p.image || uploading) return;
@@ -2311,35 +2144,6 @@ export default function Studio() {
         {layers.length > 0 && <Text style={st.dragHint}>גררו את הטקסט למיקום הרצוי · הקישו לבחירה</Text>}
         {cloudUrl && !uploading && <Text style={st.okText}>✓ העיצוב נשמר בענן</Text>}
 
-        {/* עצת איכות הדפסה — הערכה כללית, לא מפרט הדפסה רשמי */}
-        {(naturalImgSize || layers.length > 0) && (
-          <View style={st.adviceBox}>
-            <Text style={st.adviceTitle}>בדיקת איכות מהירה</Text>
-            {naturalImgSize && Math.min(naturalImgSize.w, naturalImgSize.h) < 1000 && (
-              <Text style={st.adviceLine}>⚠️ רזולוציית התמונה נמוכה יחסית — ההדפסה עלולה לצאת מטושטשת</Text>
-            )}
-            {naturalImgSize && img.w / AREA_W < 0.25 && (
-              <Text style={st.adviceLine}>⚠️ התמונה קטנה על החולצה — כדאי להגדיל להדפסה בולטת יותר</Text>
-            )}
-            {hasTransparency && (
-              <Text style={st.adviceLine}>ℹ️ לעיצוב יש רקע שקוף — ודאו שזה מתאים לצבע החולצה שבחרתם</Text>
-            )}
-            {layers
-              .filter((l) => l.text.trim() && colorDistance(l.color, shirt.hex) < 60)
-              .map((l) => (
-                <Text key={l.id} style={st.adviceLine}>
-                  ⚠️ הטקסט "{l.text.trim().slice(0, 12)}" קרוב בצבעו לצבע החולצה — עלול לא לבלוט
-                </Text>
-              ))}
-            {!layers.some((l) => l.text.trim() && colorDistance(l.color, shirt.hex) < 60) &&
-              !hasTransparency &&
-              !(naturalImgSize && (Math.min(naturalImgSize.w, naturalImgSize.h) < 1000 || img.w / AREA_W < 0.25)) && (
-                <Text style={st.adviceLineOk}>✓ נראה תקין להדפסה</Text>
-              )}
-            <Text style={st.adviceFooter}>הערכה כללית בלבד — לא תחליף לבדיקת דפוס מקצועית</Text>
-          </View>
-        )}
-
         <View style={st.rowSpread}>
           <Pressable style={st.graphicsBtn} onPress={pickImage} disabled={uploading}>
             <Text style={st.graphicsBtnText}>{localImg ? '📤 החלפת תמונה' : '📤 העלאת עיצוב'}</Text>
@@ -2367,9 +2171,6 @@ export default function Studio() {
           >
             <Text style={st.arrowText}>↷</Text>
           </Pressable>
-          <Pressable style={st.graphicsBtn} onPress={() => setGraphicsOpen(true)}>
-            <Text style={st.graphicsBtnText}>🖼 גרפיקות</Text>
-          </Pressable>
         </View>
 
         {cloudUrl && !uploading && (
@@ -2379,7 +2180,6 @@ export default function Studio() {
               {(
                 [
                   { kind: 'bg', label: 'הסרת רקע' },
-                  { kind: 'up', label: 'שיפור חדות' },
                   { kind: 'remix', label: 'עיצוב מחדש ✨' },
                 ] as const
               ).map((b) => (
@@ -2608,77 +2408,6 @@ export default function Studio() {
         </Pressable>
       </Modal>
 
-      {/* פאנל גרפיקות — כמו בקנבה: חיפוש + קטגוריות */}
-      <Modal visible={graphicsOpen} transparent animationType="slide" onRequestClose={() => setGraphicsOpen(false)}>
-        <View style={st.graphicsBackdrop}>
-          <View style={st.graphicsSheet}>
-            <View style={st.graphicsHeader}>
-              <Text style={st.graphicsTitle}>גרפיקות</Text>
-              <Pressable onPress={() => setGraphicsOpen(false)} hitSlop={8}>
-                <Text style={st.graphicsClose}>✕</Text>
-              </Pressable>
-            </View>
-            <TextInput
-              style={st.graphicsSearch}
-              value={graphicsQuery}
-              onChangeText={setGraphicsQuery}
-              placeholder="חיפוש — למשל: לב, כלב, פיצה…"
-              placeholderTextColor={C.textDim}
-            />
-            <ScrollView contentContainerStyle={st.graphicsScroll}>
-              {graphicsQuery.trim() ? (
-                (() => {
-                  const q = graphicsQuery.trim();
-                  const matches = GRAPHIC_CATEGORIES.flatMap((cat) =>
-                    cat.items.filter(
-                      (it) => it.keywords.some((k) => k.includes(q)) || cat.name.includes(q),
-                    ),
-                  );
-                  return matches.length === 0 ? (
-                    <Text style={st.graphicsEmpty}>לא נמצאו תוצאות — נסו מילה אחרת</Text>
-                  ) : (
-                    <View style={st.graphicsGrid}>
-                      {matches.map((it, i) => (
-                        <Pressable
-                          key={it.char + i}
-                          style={st.graphicCell}
-                          onPress={() => {
-                            addSymbol(it.char);
-                            setGraphicsOpen(false);
-                          }}
-                        >
-                          <Text style={st.graphicChar}>{it.char}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  );
-                })()
-              ) : (
-                GRAPHIC_CATEGORIES.map((cat) => (
-                  <View key={cat.name}>
-                    <Text style={st.graphicsCatTitle}>{cat.name}</Text>
-                    <View style={st.graphicsGrid}>
-                      {cat.items.map((it, i) => (
-                        <Pressable
-                          key={it.char + i}
-                          style={st.graphicCell}
-                          onPress={() => {
-                            addSymbol(it.char);
-                            setGraphicsOpen(false);
-                          }}
-                        >
-                          <Text style={st.graphicChar}>{it.char}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-                ))
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
       {/* פאנל עיצובים מוכנים — גלריית תמונות מוכנות מראש */}
       <Modal
         visible={readyDesignsOpen}
@@ -2899,41 +2628,8 @@ const st = StyleSheet.create({
   graphicsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   graphicsTitle: { color: C.text, fontSize: 20, fontWeight: '800' },
   graphicsClose: { color: C.textDim, fontSize: 20, fontWeight: '800' },
-  graphicsSearch: {
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: R.full,
-    color: C.text,
-    fontSize: 15,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    textAlign: 'right',
-    marginTop: S.md,
-    marginBottom: S.sm,
-  },
   graphicsScroll: { paddingBottom: S.xl },
-  graphicsCatTitle: {
-    color: C.text,
-    fontSize: 15,
-    fontWeight: '700',
-    textAlign: 'right',
-    marginTop: S.md,
-    marginBottom: S.sm,
-  },
   graphicsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: S.sm },
-  graphicCell: {
-    width: 56,
-    height: 56,
-    borderRadius: R.md,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  graphicChar: { fontSize: 28 },
-  graphicsEmpty: { color: C.textDim, fontSize: 14, textAlign: 'center', marginTop: S.xl },
   symbolBtn: {
     width: 48,
     height: 48,
@@ -2991,18 +2687,6 @@ const st = StyleSheet.create({
   },
   uploadText: { color: C.text, fontSize: 15, fontWeight: '600' },
   okText: { color: C.accent, fontSize: 13, fontWeight: '700', marginTop: 6, textAlign: 'center' },
-  adviceBox: {
-    marginTop: S.sm,
-    backgroundColor: C.surface,
-    borderRadius: R.md,
-    borderWidth: 1,
-    borderColor: C.border,
-    padding: S.sm,
-  },
-  adviceTitle: { color: C.text, fontSize: 13, fontWeight: '800', textAlign: 'right', marginBottom: 4 },
-  adviceLine: { color: '#ffd166', fontSize: 12, textAlign: 'right', marginTop: 3 },
-  adviceLineOk: { color: C.accent, fontSize: 12, textAlign: 'right', marginTop: 3 },
-  adviceFooter: { color: C.textDim, fontSize: 10, textAlign: 'right', marginTop: 6 },
   rowSpread: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: S.sm, marginTop: S.md },
   addTextBtn: { backgroundColor: C.accent, borderRadius: R.full, paddingVertical: 11, paddingHorizontal: 20 },
   addTextBtnText: { color: C.onAccent, fontSize: 15, fontWeight: '800' },
