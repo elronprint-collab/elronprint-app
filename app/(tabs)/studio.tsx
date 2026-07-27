@@ -244,6 +244,44 @@ const GRAPHIC_CATEGORIES: GraphicCategory[] = [
   },
 ];
 
+type ReadyDesign = { slug: string; label: string; source: number | string };
+
+const READY_DESIGNS: ReadyDesign[] = [
+  { slug: 'detective', label: 'בלש', source: require('../../assets/designs/detective.jpg') },
+  { slug: 'scientist', label: 'מדענית', source: require('../../assets/designs/scientist.jpg') },
+  { slug: 'sundress', label: 'שמלת קיץ', source: require('../../assets/designs/sundress.jpg') },
+  { slug: 'sporty', label: 'ספורטיבי', source: require('../../assets/designs/sporty.jpg') },
+  { slug: 'cozy', label: 'נעים', source: require('../../assets/designs/cozy.jpg') },
+  { slug: 'futuristic', label: 'עתידני', source: require('../../assets/designs/futuristic.jpg') },
+  { slug: 'rocker', label: 'רוקרית', source: require('../../assets/designs/rocker.jpg') },
+  { slug: 'mystic', label: 'מיסטית', source: require('../../assets/designs/mystic.jpg') },
+  { slug: 'reader', label: 'קוראת', source: require('../../assets/designs/reader.jpg') },
+  { slug: 'traveler', label: 'מטיילת', source: require('../../assets/designs/traveler.jpg') },
+  { slug: 'equestrian', label: 'רוכבת סוסים', source: require('../../assets/designs/equestrian.jpg') },
+  { slug: 'dancer', label: 'רקדנית', source: require('../../assets/designs/dancer.jpg') },
+  { slug: 'yoga', label: 'יוגה', source: require('../../assets/designs/yoga.jpg') },
+  { slug: 'librarian', label: 'ספרנית', source: require('../../assets/designs/librarian.jpg') },
+  { slug: 'pilot', label: 'טייסת', source: require('../../assets/designs/pilot.jpg') },
+  { slug: 'gardener', label: 'גננת', source: require('../../assets/designs/gardener.jpg') },
+  { slug: 'evening', label: 'ערב', source: require('../../assets/designs/evening.jpg') },
+  { slug: 'chef', label: 'שפית', source: require('../../assets/designs/chef.jpg') },
+  { slug: 'winter', label: 'חורף', source: require('../../assets/designs/winter.jpg') },
+  { slug: 'artist', label: 'אמנית', source: require('../../assets/designs/artist.jpg') },
+];
+
+// require('./x.jpg') מחזיר צורות שונות בדפדפן לעומת נייטיב — מחרוזת ישירה ב-web,
+// ולעיתים אובייקט עם uri, ורק בנייטיב יש resolveAssetSource אמיתי.
+function resolveDesignUri(source: number | string): string | null {
+  if (typeof source === 'string') return source;
+  const asAny = source as any;
+  if (asAny && typeof asAny === 'object' && typeof asAny.uri === 'string') return asAny.uri;
+  if (typeof RNImage.resolveAssetSource === 'function') {
+    const resolved = RNImage.resolveAssetSource(source as any);
+    if (resolved?.uri) return resolved.uri;
+  }
+  return null;
+}
+
 const ALIGNS = [
   { key: 'right', label: 'ימין' },
   { key: 'center', label: 'מרכז' },
@@ -525,6 +563,7 @@ function DraggableImage({
   onResize,
   onDragStart,
   onDragEnd,
+  onDelete,
 }: {
   uri: string;
   img: ImgTransform;
@@ -534,6 +573,7 @@ function DraggableImage({
   onResize: (patch: Partial<ImgTransform>) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
+  onDelete: () => void;
 }) {
   const start = useRef({ x: img.x, y: img.y });
   const imgRef = useRef(img);
@@ -634,6 +674,9 @@ function DraggableImage({
           <Text style={st.lockBadgeText}>🔒</Text>
         </View>
       )}
+      <Pressable style={st.deleteBadge} onPress={onDelete} hitSlop={8}>
+        <Text style={st.deleteBadgeText}>🗑</Text>
+      </Pressable>
       {selected &&
         !img.locked &&
         HANDLES.map(({ kind, leftPct, topPct }) => {
@@ -666,11 +709,12 @@ function DraggableImage({
 
 let nextId = 1;
 const DRAFT_KEY = 'epd-studio-draft-v1';
+const DEFAULT_LAYER_TEXT = 'הטקסט שלי';
 
 function newLayer(): Layer {
   return {
     id: nextId++,
-    text: 'הטקסט שלי',
+    text: DEFAULT_LAYER_TEXT,
     font: FONTS[0],
     color: '#ffffff',
     size: 26,
@@ -710,6 +754,7 @@ function webLayerMoveHandlers(
   return {
     onMouseDown: (e: any) => {
       if (layerRef.current.locked || RESIZING.active) return;
+      onSelect();
       const startX = e.clientX;
       const startY = e.clientY;
       const base = { x: layerRef.current.x, y: layerRef.current.y };
@@ -722,7 +767,6 @@ function webLayerMoveHandlers(
           if (Math.abs(dx) + Math.abs(dy) <= 2) return;
           started = true;
           onDragStart();
-          onSelect();
         }
         const halfW = (layerRef.current.width ?? measuredRef.current.w) / 2;
         const halfH = (layerRef.current.height ?? measuredRef.current.h) / 2;
@@ -821,6 +865,7 @@ function DraggableText({
   onDragStart,
   onDragEnd,
   onMeasured,
+  onDelete,
 }: {
   layer: Layer;
   selected: boolean;
@@ -830,6 +875,7 @@ function DraggableText({
   onDragStart: () => void;
   onDragEnd: () => void;
   onMeasured?: (w: number, h: number) => void;
+  onDelete: () => void;
 }) {
   const start = useRef({ x: layer.x, y: layer.y });
   const layerRef = useRef(layer);
@@ -981,6 +1027,9 @@ function DraggableText({
           <Text style={st.lockBadgeText}>🔒</Text>
         </View>
       )}
+      <Pressable style={st.deleteBadge} onPress={onDelete} hitSlop={8}>
+        <Text style={st.deleteBadgeText}>🗑</Text>
+      </Pressable>
       {canEditHandles &&
         HANDLES.map(({ kind, leftPct, topPct }) => {
           const isCorner = kind.length === 2;
@@ -1146,7 +1195,7 @@ export default function Studio() {
   useEffect(() => {
     if (!draftLoaded.current) return;
     const t = setTimeout(() => {
-      const hasContent = layers.some((l) => l.text.trim()) || !!localImg;
+      const hasContent = layers.some((l) => l.text.trim() && l.text.trim() !== DEFAULT_LAYER_TEXT) || !!localImg;
       if (!hasContent) {
         AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
         return;
@@ -1241,31 +1290,10 @@ export default function Studio() {
     setSelectedId(l.id);
   }
 
-  function removeSelected() {
-    if (selectedId == null) return;
+  function removeLayerById(id: number) {
     snapshot();
-    setLayers((ls) => ls.filter((l) => l.id !== selectedId));
-    setSelectedId(null);
-  }
-
-  function duplicateSelected() {
-    if (selectedId == null || !selected) return;
-    snapshot();
-    const copy: Layer = { ...selected, id: nextId++, x: selected.x + 14, y: selected.y + 14 };
-    setLayers((ls) => [...ls, copy]);
-    setSelectedId(copy.id);
-  }
-
-  // העתק סגנון (format painter) — מעתיק את מאפייני העיצוב של שכבת הטקסט (לא את התוכן) כדי להדביק על שכבה אחרת
-  function copyStyle() {
-    if (!selected) return;
-    const { text, x, y, id, locked, ...style } = selected;
-    setCopiedStyle(style);
-  }
-
-  function pasteStyle() {
-    if (!copiedStyle) return;
-    updateSelected(copiedStyle);
+    setLayers((ls) => ls.filter((l) => l.id !== id));
+    if (selectedId === id) setSelectedId(null);
   }
 
   function updateImg(patch: Partial<ImgTransform>, withSnapshot = true) {
@@ -1367,7 +1395,6 @@ export default function Studio() {
   const [inspiration, setInspiration] = useState<Product[]>([]);
   const [scrollLocked, setScrollLocked] = useState(false);
   const [openPanel, setOpenPanel] = useState<null | 'font' | 'color' | 'highlight' | 'more' | 'align'>(null);
-  const [copiedStyle, setCopiedStyle] = useState<Partial<Layer> | null>(null);
   const fontScrollRef = useRef<ScrollView>(null);
   const fontScrollX = useRef(0);
   const [shirtPaletteOpen, setShirtPaletteOpen] = useState(false);
@@ -1379,6 +1406,7 @@ export default function Studio() {
     { key: 'solid', label: '—' },
   ];
   const [graphicsOpen, setGraphicsOpen] = useState(false);
+  const [readyDesignsOpen, setReadyDesignsOpen] = useState(false);
   const [graphicsQuery, setGraphicsQuery] = useState('');
   const [zoomOpen, setZoomOpen] = useState(false);
 
@@ -1436,6 +1464,29 @@ export default function Studio() {
       setCloudUrl(url);
     } catch {
       Alert.alert('שגיאה', 'העלאת התמונה נכשלה. בדקו חיבור לאינטרנט ונסו שוב.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function useReadyDesign(design: ReadyDesign) {
+    const uri = resolveDesignUri(design.source);
+    if (!uri) {
+      Alert.alert('שגיאה', 'לא ניתן לטעון את העיצוב הזה, נסו שנית');
+      return;
+    }
+    setReadyDesignsOpen(false);
+    snapshot();
+    setLocalImg(uri);
+    setUploading(true);
+    setCloudUrl(null);
+    setHasTransparency(false);
+    fitImageBox(uri);
+    try {
+      const url = await uploadImage(uri);
+      setCloudUrl(url);
+    } catch {
+      Alert.alert('שגיאה', 'טעינת העיצוב נכשלה. בדקו חיבור לאינטרנט ונסו שוב.');
     } finally {
       setUploading(false);
     }
@@ -1624,11 +1675,11 @@ export default function Studio() {
         scrollEnabled={!scrollLocked}
       >
         {/* תצוגה מקדימה */}
-        <View style={[st.shirtPreview, { height: AREA_H + 80, backgroundColor: shirt.hex }]}>
+        <View style={[st.shirtPreview, { height: AREA_H + 80 }]}>
           <View
             style={[
               st.printArea,
-              { width: AREA_W, height: AREA_H, borderColor: lightShirt ? '#00000022' : '#ffffff22' },
+              { width: AREA_W, height: AREA_H, backgroundColor: shirt.hex, borderColor: lightShirt ? '#00000022' : '#ffffff22' },
             ]}
           >
             {localImg && (
@@ -1647,6 +1698,7 @@ export default function Studio() {
                 onDragEnd={() => setScrollLocked(false)}
                 onMove={(x, y) => setImg((prev) => ({ ...prev, x, y }))}
                 onResize={(patch) => setImg((prev) => ({ ...prev, ...patch }))}
+                onDelete={removeImage}
               />
             )}
             {!localImg && layers.length === 0 && (
@@ -1673,6 +1725,7 @@ export default function Studio() {
                 onMeasured={(w, h) => {
                   layerSizeRef.current[l.id] = { w, h };
                 }}
+                onDelete={() => removeLayerById(l.id)}
               />
             ))}
           </View>
@@ -2269,6 +2322,18 @@ export default function Studio() {
         )}
 
         <View style={st.rowSpread}>
+          <Pressable style={st.graphicsBtn} onPress={pickImage} disabled={uploading}>
+            <Text style={st.graphicsBtnText}>{localImg ? '📤 החלפת תמונה' : '📤 העלאת עיצוב'}</Text>
+          </Pressable>
+          <Pressable style={st.graphicsBtn} onPress={() => setReadyDesignsOpen(true)}>
+            <Text style={st.graphicsBtnText}>✨ עיצובים מוכנים</Text>
+          </Pressable>
+          <Pressable style={st.addTextBtn} onPress={addLayer}>
+            <Text style={st.addTextBtnText}>+ הוספת טקסט</Text>
+          </Pressable>
+        </View>
+
+        <View style={st.rowSpread}>
           <Pressable
             onPress={undo}
             disabled={past.current.length === 0}
@@ -2283,37 +2348,10 @@ export default function Studio() {
           >
             <Text style={st.arrowText}>↷</Text>
           </Pressable>
-          {selected && (
-            <Pressable style={st.deleteBtn} onPress={removeSelected}>
-              <Text style={st.deleteText}>🗑 מחיקה</Text>
-            </Pressable>
-          )}
-          {selected && (
-            <Pressable style={st.deleteBtn} onPress={duplicateSelected}>
-              <Text style={st.deleteText}>⧉ שכפול</Text>
-            </Pressable>
-          )}
-          {selected && (
-            <Pressable style={st.deleteBtn} onPress={copyStyle}>
-              <Text style={st.deleteText}>🖌 העתק סגנון</Text>
-            </Pressable>
-          )}
-          {selected && copiedStyle && (
-            <Pressable style={st.deleteBtn} onPress={pasteStyle}>
-              <Text style={st.deleteText}>🖌 הדבק סגנון</Text>
-            </Pressable>
-          )}
           <Pressable style={st.graphicsBtn} onPress={() => setGraphicsOpen(true)}>
             <Text style={st.graphicsBtnText}>🖼 גרפיקות</Text>
           </Pressable>
-          <Pressable style={st.graphicsBtn} onPress={pickImage} disabled={uploading}>
-            <Text style={st.graphicsBtnText}>{localImg ? '📤 החלפת תמונה' : '📤 העלאת עיצוב'}</Text>
-          </Pressable>
-          <Pressable style={st.addTextBtn} onPress={addLayer}>
-            <Text style={st.addTextBtnText}>+ הוספת טקסט</Text>
-          </Pressable>
         </View>
-
 
         {cloudUrl && !uploading && (
           <>
@@ -2407,10 +2445,6 @@ export default function Studio() {
           </>
         )}
 
-        <Pressable style={st.uploadBtn} onPress={pickImage} disabled={uploading}>
-          <Text style={st.uploadBtnText}>{localImg ? 'החלפת תמונה' : 'העלאת עיצוב מהגלריה'}</Text>
-        </Pressable>
-
         <Pressable
           style={[st.nextBtn, (!hasDesign && !localImg || uploading || ordering) && st.nextBtnDisabled]}
           disabled={(!hasDesign && !localImg) || uploading || ordering}
@@ -2447,9 +2481,9 @@ export default function Studio() {
       {/* תצוגה מוגדלת */}
       <Modal visible={zoomOpen} transparent animationType="fade" onRequestClose={() => setZoomOpen(false)}>
         <Pressable style={st.zoomBackdrop} onPress={() => setZoomOpen(false)}>
-          <View style={[st.zoomShirt, { backgroundColor: shirt.hex }]}>
+          <View style={st.zoomShirt}>
             <View style={{ transform: [{ scale: 1.45 }] }}>
-              <View style={[st.printArea, { width: AREA_W, height: AREA_H, borderColor: 'transparent' }]}>
+              <View style={[st.printArea, { width: AREA_W, height: AREA_H, backgroundColor: shirt.hex, borderColor: 'transparent' }]}>
                 {localImg && (
                   <View
                     style={{
@@ -2626,6 +2660,38 @@ export default function Studio() {
           </View>
         </View>
       </Modal>
+
+      {/* פאנל עיצובים מוכנים — גלריית תמונות מוכנות מראש */}
+      <Modal
+        visible={readyDesignsOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setReadyDesignsOpen(false)}
+      >
+        <View style={st.graphicsBackdrop}>
+          <View style={st.graphicsSheet}>
+            <View style={st.graphicsHeader}>
+              <Text style={st.graphicsTitle}>עיצובים מוכנים</Text>
+              <Pressable onPress={() => setReadyDesignsOpen(false)} hitSlop={8}>
+                <Text style={st.graphicsClose}>✕</Text>
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={st.graphicsScroll}>
+              <View style={st.graphicsGrid}>
+                {READY_DESIGNS.map((d) => {
+                  const thumbUri = resolveDesignUri(d.source);
+                  return (
+                    <Pressable key={d.slug} style={st.readyDesignCell} onPress={() => useReadyDesign(d)}>
+                      {thumbUri && <Image source={{ uri: thumbUri }} style={st.readyDesignImg} contentFit="cover" />}
+                      <Text style={st.readyDesignLabel}>{d.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2699,6 +2765,20 @@ const st = StyleSheet.create({
     justifyContent: 'center',
   },
   lockBadgeText: { fontSize: 11 },
+  deleteBadge: {
+    position: 'absolute',
+    top: -20,
+    left: -4,
+    width: 22,
+    height: 22,
+    borderRadius: R.full,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteBadgeText: { fontSize: 11 },
   dragHint: { color: C.textDim, fontSize: 12, textAlign: 'center', marginTop: 6 },
   zoomBtn: {
     position: 'absolute',
@@ -2870,6 +2950,22 @@ const st = StyleSheet.create({
     borderColor: C.border,
   },
   inspoImg: { width: '100%', height: '100%' },
+  readyDesignCell: {
+    width: 100,
+    borderRadius: R.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+  },
+  readyDesignImg: { width: '100%', height: 100 },
+  readyDesignLabel: {
+    color: C.text,
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingVertical: 6,
+  },
   customBox: {
     marginTop: S.sm,
     backgroundColor: C.bg,
