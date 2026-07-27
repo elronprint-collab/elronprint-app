@@ -2803,8 +2803,8 @@ const st = StyleSheet.create({
   lockBadgeText: { fontSize: 11 },
   deleteBadge: {
     position: 'absolute',
-    top: -20,
-    left: -4,
+    top: 4,
+    left: 4,
     width: 22,
     height: 22,
     borderRadius: R.full,
