@@ -282,6 +282,21 @@ function resolveDesignUri(source: number | string): string | null {
   return null;
 }
 
+// עיצובים מוכנים — סטריפ ה"עיצובים מוכנים" מעל אזור ההעלאה (מחליף את הרשימה שהגיעה
+// בעבר מ-Shopify best-sellers). בחירה טוענת את העיצוב כתמונה, בדיוק כמו READY_DESIGNS.
+const STARTER_DESIGNS: ReadyDesign[] = [
+  { slug: 'forest-lord', label: 'Forest Lord', source: require('../../assets/designs/forest-lord.png') },
+  { slug: 'cold-blood', label: 'Cold Blood', source: require('../../assets/designs/cold-blood.png') },
+  { slug: 'savanna-king', label: 'Savanna King', source: require('../../assets/designs/savanna-king.png') },
+  { slug: 'desert-peak', label: 'Desert Peak', source: require('../../assets/designs/desert-peak.png') },
+  { slug: 'snow-hunter', label: 'Snow Hunter', source: require('../../assets/designs/snow-hunter.png') },
+  { slug: 'wild-spirit', label: 'Wild Spirit', source: require('../../assets/designs/wild-spirit.png') },
+  { slug: 'deep-ocean', label: 'Deep Ocean', source: require('../../assets/designs/deep-ocean.png') },
+  { slug: 'urban-beast', label: 'Urban Beast', source: require('../../assets/designs/urban-beast.png') },
+  { slug: 'night-stalker', label: 'Night Stalker', source: require('../../assets/designs/night-stalker.png') },
+  { slug: 'eye-of-power', label: 'Eye of Power', source: require('../../assets/designs/eye-of-power.png') },
+];
+
 const ALIGNS = [
   { key: 'right', label: 'ימין' },
   { key: 'center', label: 'מרכז' },
@@ -1492,6 +1507,28 @@ export default function Studio() {
     }
   }
 
+  async function useStarterDesign(design: ReadyDesign) {
+    const uri = resolveDesignUri(design.source);
+    if (!uri) {
+      Alert.alert('שגיאה', 'לא ניתן לטעון את העיצוב הזה, נסו שנית');
+      return;
+    }
+    snapshot();
+    setLocalImg(uri);
+    setUploading(true);
+    setCloudUrl(null);
+    setHasTransparency(false);
+    fitImageBox(uri);
+    try {
+      const url = await uploadImage(uri);
+      setCloudUrl(url);
+    } catch {
+      Alert.alert('שגיאה', 'טעינת העיצוב נכשלה. בדקו חיבור לאינטרנט ונסו שוב.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function runAi(kind: 'bg' | 'up' | 'remix') {
     if (!cloudUrl || aiBusy || uploading) return;
     setAiBusy(kind);
@@ -2429,21 +2466,20 @@ export default function Studio() {
         </View>
 
         {/* השראה מהעיצובים בחנות */}
-        {inspiration.length > 0 && (
-          <>
-            <Text style={st.label}>התחלה מעיצוב מהחנות</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.fontRow}>
-              {inspiration.map((p) =>
-                p.image ? (
-                  <Pressable key={p.id} style={st.inspoCard} onPress={() => useTemplate(p)}>
-                    <Image source={{ uri: p.image }} style={st.inspoImg} contentFit="cover" />
-                  </Pressable>
-                ) : null,
-              )}
-            </ScrollView>
-            <Text style={st.hint}>בוחרים עיצוב ← לוחצים "עיצוב מחדש ✨" לקבלת גרסה ייחודית משלכם</Text>
-          </>
-        )}
+        <>
+          <Text style={st.label}>עיצובים מוכנים</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.fontRow}>
+            {STARTER_DESIGNS.map((d) => {
+              const thumbUri = resolveDesignUri(d.source);
+              return thumbUri ? (
+                <Pressable key={d.slug} style={st.inspoCard} onPress={() => useStarterDesign(d)}>
+                  <Image source={{ uri: thumbUri }} style={st.inspoImg} contentFit="cover" />
+                </Pressable>
+              ) : null;
+            })}
+          </ScrollView>
+          <Text style={st.hint}>בוחרים עיצוב ← לוחצים "עיצוב מחדש ✨" לקבלת גרסה ייחודית משלכם</Text>
+        </>
 
         <Pressable
           style={[st.nextBtn, (!hasDesign && !localImg || uploading || ordering) && st.nextBtnDisabled]}
