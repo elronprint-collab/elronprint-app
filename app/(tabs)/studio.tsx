@@ -360,35 +360,47 @@ const MIN_TEXT_SIZE = 12;
 const MAX_TEXT_SIZE = 96;
 const MIN_BOX_WIDTH = 40;
 let MAX_BOX_WIDTH = AREA_W;
+const MIN_BOX_HEIGHT = 30;
+let MAX_BOX_HEIGHT = AREA_H;
 
 function clamp(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, v));
 }
 
-// מחשב את השינוי בגודל/רוחב/מיקום לפי כיוון הידית שנגררת
+// מחשב את השינוי בגודל/רוחב/גובה/מיקום לפי כיוון הידית שנגררת.
+//
+// שונה מהמימוש הקודם: קודם הידיות העליונה/תחתונה ('n'/'s') שינו רק את גודל הפונט,
+// והפינות שינו רק רוחב — הגובה של התיבה מעולם לא השתנה. מכיוון ששכבת ברירת המחדל
+// נוצרת בגובה הקנבס המלא, המשמעות הייתה שהידיות האלה פשוט לא זזות לשום מקום, וזה
+// נראה בדיוק כמו "הידית לא עובדת". בתמונה זה תמיד עבד כי שם כל ידית משנה w/h ממש.
+// עכשיו הטקסט מתנהג כמו התמונה: 'n'/'s' משנות גובה, והפינות משנות רוחב+גובה
+// (וגם את גודל הפונט, כדי שהטקסט יגדל/יקטן יחד עם התיבה).
 function computeResizePatch(
   kind: HandleKind,
   dx: number,
   dy: number,
-  base: { size: number; width: number; x: number },
+  base: { size: number; width: number; height: number; x: number; y: number },
 ): Partial<Layer> {
+  // פינה: משנה רוחב+גובה+מיקום, ובנוסף מקנה לפונט שינוי יחסי לפי האלכסון
+  const corner = (dxs: number, dys: number): Partial<Layer> => {
+    const width = clamp(Math.round(base.width + dxs), MIN_BOX_WIDTH, MAX_BOX_WIDTH);
+    const height = clamp(Math.round(base.height + dys), MIN_BOX_HEIGHT, MAX_BOX_HEIGHT);
+    const x = clamp(Math.round(base.x + dxs / 2), width / 2, AREA_W - width / 2);
+    const y = clamp(Math.round(base.y + dys / 2), height / 2, AREA_H - height / 2);
+    const diag = (dxs + dys) / 2;
+    const size = clamp(Math.round(base.size + diag * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE);
+    return { width, height, x, y, size };
+  };
+
   switch (kind) {
-    case 'se': {
-      const diag = (dx + dy) / 2;
-      return { size: clamp(Math.round(base.size + diag * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE), width: clamp(Math.round(base.width + diag), MIN_BOX_WIDTH, MAX_BOX_WIDTH) };
-    }
-    case 'sw': {
-      const diag = (-dx + dy) / 2;
-      return { size: clamp(Math.round(base.size + diag * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE), width: clamp(Math.round(base.width + diag), MIN_BOX_WIDTH, MAX_BOX_WIDTH) };
-    }
-    case 'ne': {
-      const diag = (dx - dy) / 2;
-      return { size: clamp(Math.round(base.size + diag * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE), width: clamp(Math.round(base.width + diag), MIN_BOX_WIDTH, MAX_BOX_WIDTH) };
-    }
-    case 'nw': {
-      const diag = (-dx - dy) / 2;
-      return { size: clamp(Math.round(base.size + diag * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE), width: clamp(Math.round(base.width + diag), MIN_BOX_WIDTH, MAX_BOX_WIDTH) };
-    }
+    case 'se':
+      return corner(dx, dy);
+    case 'sw':
+      return corner(-dx, dy);
+    case 'ne':
+      return corner(dx, -dy);
+    case 'nw':
+      return corner(-dx, -dy);
     case 'e': {
       const width = clamp(Math.round(base.width + dx), MIN_BOX_WIDTH, MAX_BOX_WIDTH);
       // המיקום גם הוא מוגבל לפי הרוחב החדש (אחרי הקיפוא) — אותו תיקון שכבר בוצע לתמונה
@@ -400,10 +412,17 @@ function computeResizePatch(
       const x = clamp(Math.round(base.x + dx / 2), width / 2, AREA_W - width / 2);
       return { width, x };
     }
-    case 's':
-      return { size: clamp(Math.round(base.size + dy * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE) };
-    case 'n':
-      return { size: clamp(Math.round(base.size - dy * 0.7), MIN_TEXT_SIZE, MAX_TEXT_SIZE) };
+    case 's': {
+      // בדיוק כמו התמונה: גובה + מיקום, כדי שהידית באמת תזוז אחרי האצבע
+      const height = clamp(Math.round(base.height + dy), MIN_BOX_HEIGHT, MAX_BOX_HEIGHT);
+      const y = clamp(Math.round(base.y + dy / 2), height / 2, AREA_H - height / 2);
+      return { height, y };
+    }
+    case 'n': {
+      const height = clamp(Math.round(base.height - dy), MIN_BOX_HEIGHT, MAX_BOX_HEIGHT);
+      const y = clamp(Math.round(base.y + dy / 2), height / 2, AREA_H - height / 2);
+      return { height, y };
+    }
   }
 }
 
@@ -757,7 +776,7 @@ function useHandleResponder(
   onDragStart: () => void,
   onDragEnd: () => void,
 ) {
-  const base = useRef({ size: 0, width: 0, x: 0 });
+  const base = useRef({ size: 0, width: 0, height: 0, x: 0, y: 0 });
   return useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -770,7 +789,9 @@ function useHandleResponder(
         base.current = {
           size: layerRef.current.size,
           width: layerRef.current.width ?? measuredRef.current.w,
+          height: layerRef.current.height ?? measuredRef.current.h,
           x: layerRef.current.x,
+          y: layerRef.current.y,
         };
         onDragStart();
       },
@@ -807,7 +828,7 @@ function DraggableText({
   layerRef.current = layer;
   const measuredRef = useRef({ w: 100, h: 30 });
   // ערכי הבסיס נלכדים ברגע תחילת הגרירה של ידית, וכל התזוזה מחושבת יחסית אליהם
-  const handleBase = useRef({ size: 0, width: 0, x: 0 });
+  const handleBase = useRef({ size: 0, width: 0, height: 0, x: 0, y: 0 });
   // מצב לרינדור מיקום הידיות בפיקסלים — נדרש בנייד: אחוזים (%) ביחס לתיבה שמתאימה עצמה
   // אוטומטית לתוכן (auto-size) לא נפתרים באופן אמין ב-Yoga/RN Native כמו בדפדפן,
   // ולכן שם הידיות "זזות" ולא נשארות במקום. פיקסלים מדויקים פותרים את זה בשתי הפלטפורמות.
@@ -997,7 +1018,9 @@ function DraggableText({
                   handleBase.current = {
                     size: layerRef.current.size,
                     width: layerRef.current.width ?? measuredRef.current.w,
+                    height: layerRef.current.height ?? measuredRef.current.h,
                     x: layerRef.current.x,
+                    y: layerRef.current.y,
                   };
                   onDragStart();
                 }}
@@ -1083,6 +1106,7 @@ export default function Studio() {
       AREA_W = nextW;
       AREA_H = nextH;
       MAX_BOX_WIDTH = AREA_W;
+      MAX_BOX_HEIGHT = AREA_H;
       MAX_IMG_SIZE = AREA_W - 6;
       MAX_IMG_SIZE_H = AREA_H - 6;
       bumpCanvas((n) => n + 1);
