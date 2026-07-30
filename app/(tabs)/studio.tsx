@@ -27,6 +27,7 @@ import { uploadImage, uploadRemote } from '../../lib/cloudinary';
 import { fetchCustomProduct, fetchProducts, isConfigured, Product } from '../../lib/shopify';
 import { C, R, S } from '../../lib/theme';
 import {
+  applyMagicWand,
   applyWhiteThresholds,
   BG_HI_DEFAULT,
   BG_HI_MAX,
@@ -36,6 +37,12 @@ import {
   BG_LO_MIN,
   canRemoveWhiteLocally,
   prepareWhiteSource,
+  WAND_IN_DEFAULT,
+  WAND_IN_MAX,
+  WAND_IN_MIN,
+  WAND_OUT_DEFAULT,
+  WAND_OUT_MAX,
+  WAND_OUT_MIN,
   type WhiteSource,
 } from '../../lib/transparent';
 
@@ -1131,8 +1138,11 @@ export default function Studio() {
 
   // כלי הסרת רקע לבן (מקומי, בלי AI) — זהה לכלי שבאתר /pages/transparent-tool
   const [bgOpen, setBgOpen] = useState(false);
+  const [bgMode, setBgMode] = useState<'white' | 'wand'>('white');
   const [bgLo, setBgLo] = useState(BG_LO_DEFAULT);
   const [bgHi, setBgHi] = useState(BG_HI_DEFAULT);
+  const [bgWandIn, setBgWandIn] = useState(WAND_IN_DEFAULT);
+  const [bgWandOut, setBgWandOut] = useState(WAND_OUT_DEFAULT);
   const [bgPreview, setBgPreview] = useState<string | null>(null);
   const [bgLoading, setBgLoading] = useState(false);
   const [bgApplying, setBgApplying] = useState(false);
@@ -1538,7 +1548,7 @@ export default function Studio() {
       // תצוגה מוקטנת כדי שהסליידרים יגיבו מיד
       const prepared = await prepareWhiteSource(src, 700);
       bgSource.current = prepared;
-      setBgPreview(applyWhiteThresholds(prepared, bgLo, bgHi));
+      setBgPreview(renderBg(prepared, bgMode, bgLo, bgHi, bgWandIn, bgWandOut));
     } catch (e) {
       setBgOpen(false);
       Alert.alert('שגיאה', e instanceof Error ? e.message : 'קריאת התמונה נכשלה');
@@ -1547,10 +1557,35 @@ export default function Studio() {
     }
   }
 
-  function refreshBgPreview(lo: number, hi: number) {
+  function renderBg(
+    prepared: WhiteSource,
+    mode: 'white' | 'wand',
+    lo: number,
+    hi: number,
+    wandIn: number,
+    wandOut: number,
+  ) {
+    return mode === 'wand'
+      ? applyMagicWand(prepared, wandIn, wandOut)
+      : applyWhiteThresholds(prepared, lo, hi);
+  }
+
+  function refreshBgPreview(
+    mode: 'white' | 'wand',
+    lo: number,
+    hi: number,
+    wandIn: number,
+    wandOut: number,
+  ) {
     const prepared = bgSource.current;
     if (!prepared) return;
-    setBgPreview(applyWhiteThresholds(prepared, lo, hi));
+    setBgPreview(renderBg(prepared, mode, lo, hi, wandIn, wandOut));
+  }
+
+  function switchBgMode(mode: 'white' | 'wand') {
+    if (mode === bgMode) return;
+    setBgMode(mode);
+    refreshBgPreview(mode, bgLo, bgHi, bgWandIn, bgWandOut);
   }
 
   function onBgLoChange(v: number) {
@@ -1558,7 +1593,7 @@ export default function Studio() {
     const hi = Math.max(bgHi, Math.min(BG_HI_MAX, lo + 1));
     setBgLo(lo);
     setBgHi(hi);
-    refreshBgPreview(lo, hi);
+    refreshBgPreview('white', lo, hi, bgWandIn, bgWandOut);
   }
 
   function onBgHiChange(v: number) {
@@ -1566,7 +1601,23 @@ export default function Studio() {
     const lo = Math.min(bgLo, Math.max(BG_LO_MIN, hi - 1));
     setBgLo(lo);
     setBgHi(hi);
-    refreshBgPreview(lo, hi);
+    refreshBgPreview('white', lo, hi, bgWandIn, bgWandOut);
+  }
+
+  function onWandInChange(v: number) {
+    const wandIn = Math.round(v);
+    const wandOut = Math.max(bgWandOut, Math.min(WAND_OUT_MAX, wandIn + 1));
+    setBgWandIn(wandIn);
+    setBgWandOut(wandOut);
+    refreshBgPreview('wand', bgLo, bgHi, wandIn, wandOut);
+  }
+
+  function onWandOutChange(v: number) {
+    const wandOut = Math.round(v);
+    const wandIn = Math.min(bgWandIn, Math.max(WAND_IN_MIN, wandOut - 1));
+    setBgWandIn(wandIn);
+    setBgWandOut(wandOut);
+    refreshBgPreview('wand', bgLo, bgHi, wandIn, wandOut);
   }
 
   async function applyBgTool() {
@@ -1576,7 +1627,7 @@ export default function Studio() {
     try {
       // העיבוד הסופי ברזולוציה מלאה, לא בגרסה המוקטנת של התצוגה
       const full = await prepareWhiteSource(src, 4096);
-      const dataUrl = applyWhiteThresholds(full, bgLo, bgHi);
+      const dataUrl = renderBg(full, bgMode, bgLo, bgHi, bgWandIn, bgWandOut);
       const url = await uploadImage(dataUrl);
       setLocalImg(url);
       setCloudUrl(url);
@@ -2692,16 +2743,37 @@ export default function Studio() {
         <View style={st.graphicsBackdrop}>
           <View style={st.bgSheet}>
             <View style={st.graphicsHeader}>
-              <Text style={st.graphicsTitle}>הסרת רקע לבן</Text>
+              <Text style={st.graphicsTitle}>הסרת רקע</Text>
               <Pressable onPress={closeBgTool} hitSlop={8}>
                 <Text style={st.graphicsClose}>✕</Text>
               </Pressable>
             </View>
 
             <ScrollView contentContainerStyle={st.bgScroll}>
+              <View style={st.bgTabs}>
+                {(
+                  [
+                    { mode: 'white', label: 'רקע לבן' },
+                    { mode: 'wand', label: 'מטה קסם' },
+                  ] as const
+                ).map((t) => (
+                  <Pressable
+                    key={t.mode}
+                    style={[st.bgTab, bgMode === t.mode && st.bgTabOn]}
+                    onPress={() => switchBgMode(t.mode)}
+                    disabled={bgLoading || bgApplying}
+                  >
+                    <Text style={[st.bgTabText, bgMode === t.mode && st.bgTabTextOn]}>
+                      {t.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
               <Text style={st.bgSub}>
-                כל פיקסל קרוב ללבן הופך שקוף לגמרי, וכל פיקסל אחר נשאר אטום. עובד על עיצובים עם רקע
-                לבן אחיד.
+                {bgMode === 'wand'
+                  ? 'מסיר רק רקע שמחובר לשוליים, ולכן צבע בהיר שנמצא בתוך העיצוב (עין, חור באות) נשאר. עובד גם על רקע שאינו לבן.'
+                  : 'כל פיקסל קרוב ללבן הופך שקוף לגמרי, וכל פיקסל אחר נשאר אטום. עובד על עיצובים עם רקע לבן אחיד.'}
               </Text>
 
               <View
@@ -2720,17 +2792,19 @@ export default function Studio() {
 
               <View style={st.bgControl}>
                 <View style={st.bgLabelRow}>
-                  <Text style={st.bgValue}>{bgLo}</Text>
-                  <Text style={st.bgLabel}>סף אטימות מלאה</Text>
+                  <Text style={st.bgValue}>{bgMode === 'wand' ? bgWandIn : bgLo}</Text>
+                  <Text style={st.bgLabel}>
+                    {bgMode === 'wand' ? 'סף הסרה' : 'סף אטימות מלאה'}
+                  </Text>
                 </View>
                 <Slider
                   style={st.slider}
                   inverted={SLIDER_INVERTED}
-                  minimumValue={BG_LO_MIN}
-                  maximumValue={BG_LO_MAX}
+                  minimumValue={bgMode === 'wand' ? WAND_IN_MIN : BG_LO_MIN}
+                  maximumValue={bgMode === 'wand' ? WAND_IN_MAX : BG_LO_MAX}
                   step={1}
-                  value={bgLo}
-                  onValueChange={onBgLoChange}
+                  value={bgMode === 'wand' ? bgWandIn : bgLo}
+                  onValueChange={bgMode === 'wand' ? onWandInChange : onBgLoChange}
                   minimumTrackTintColor={C.accent}
                   maximumTrackTintColor={C.border}
                   thumbTintColor={C.accent}
@@ -2739,17 +2813,19 @@ export default function Studio() {
 
               <View style={st.bgControl}>
                 <View style={st.bgLabelRow}>
-                  <Text style={st.bgValue}>{bgHi}</Text>
-                  <Text style={st.bgLabel}>סף שקיפות מלאה</Text>
+                  <Text style={st.bgValue}>{bgMode === 'wand' ? bgWandOut : bgHi}</Text>
+                  <Text style={st.bgLabel}>
+                    {bgMode === 'wand' ? 'סף שוליים רכים' : 'סף שקיפות מלאה'}
+                  </Text>
                 </View>
                 <Slider
                   style={st.slider}
                   inverted={SLIDER_INVERTED}
-                  minimumValue={BG_HI_MIN}
-                  maximumValue={BG_HI_MAX}
+                  minimumValue={bgMode === 'wand' ? WAND_OUT_MIN : BG_HI_MIN}
+                  maximumValue={bgMode === 'wand' ? WAND_OUT_MAX : BG_HI_MAX}
                   step={1}
-                  value={bgHi}
-                  onValueChange={onBgHiChange}
+                  value={bgMode === 'wand' ? bgWandOut : bgHi}
+                  onValueChange={bgMode === 'wand' ? onWandOutChange : onBgHiChange}
                   minimumTrackTintColor={C.accent}
                   maximumTrackTintColor={C.border}
                   thumbTintColor={C.accent}
@@ -2757,8 +2833,17 @@ export default function Studio() {
               </View>
 
               <Text style={st.bgNote}>
-                שוליים לבנים דקים סביב האותיות? הורידו את סף האטימות.{'\n'}
-                צבעים בהירים בעיצוב נעלמים בטעות? העלו את סף השקיפות.
+                {bgMode === 'wand' ? (
+                  <>
+                    נשאר רקע שלא הוסר? העלו את סף ההסרה.{'\n'}
+                    נאכל חלק מהעיצוב? הורידו את סף ההסרה.
+                  </>
+                ) : (
+                  <>
+                    שוליים לבנים דקים סביב האותיות? הורידו את סף האטימות.{'\n'}
+                    צבעים בהירים בעיצוב נעלמים בטעות? העלו את סף השקיפות.
+                  </>
+                )}
               </Text>
 
               <View style={st.bgActions}>
@@ -3279,6 +3364,19 @@ const st = StyleSheet.create({
     padding: S.md,
   },
   bgScroll: { paddingBottom: S.lg, alignItems: 'center' },
+  bgTabs: {
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    gap: S.xs,
+    backgroundColor: C.surface,
+    borderRadius: R.full,
+    padding: 4,
+    marginTop: S.sm,
+  },
+  bgTab: { flex: 1, borderRadius: R.full, paddingVertical: 9, alignItems: 'center' },
+  bgTabOn: { backgroundColor: C.accent },
+  bgTabText: { color: C.textDim, fontSize: 14, fontWeight: '700' },
+  bgTabTextOn: { color: C.onAccent },
   bgSub: {
     color: C.textDim,
     fontSize: 13,
