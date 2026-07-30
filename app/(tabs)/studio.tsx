@@ -26,6 +26,18 @@ import { useCart } from '../../lib/cart';
 import { uploadImage, uploadRemote } from '../../lib/cloudinary';
 import { fetchCustomProduct, fetchProducts, isConfigured, Product } from '../../lib/shopify';
 import { C, R, S } from '../../lib/theme';
+import {
+  applyWhiteThresholds,
+  BG_HI_DEFAULT,
+  BG_HI_MAX,
+  BG_HI_MIN,
+  BG_LO_DEFAULT,
+  BG_LO_MAX,
+  BG_LO_MIN,
+  canRemoveWhiteLocally,
+  prepareWhiteSource,
+  type WhiteSource,
+} from '../../lib/transparent';
 
 const SHIRT_COLORS = [
   { name: 'שחור', hex: '#1b1b1b' },
@@ -1117,6 +1129,15 @@ export default function Studio() {
   const [ordering, setOrdering] = useState(false);
   const [aiBusy, setAiBusy] = useState<null | 'bg' | 'up' | 'remix'>(null);
 
+  // כלי הסרת רקע לבן (מקומי, בלי AI) — זהה לכלי שבאתר /pages/transparent-tool
+  const [bgOpen, setBgOpen] = useState(false);
+  const [bgLo, setBgLo] = useState(BG_LO_DEFAULT);
+  const [bgHi, setBgHi] = useState(BG_HI_DEFAULT);
+  const [bgPreview, setBgPreview] = useState<string | null>(null);
+  const [bgLoading, setBgLoading] = useState(false);
+  const [bgApplying, setBgApplying] = useState(false);
+  const bgSource = useRef<WhiteSource | null>(null);
+
   const [layers, setLayers] = useState<Layer[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const selected = layers.find((l) => l.id === selectedId) ?? null;
@@ -1496,6 +1517,76 @@ export default function Studio() {
       Alert.alert('שגיאה', e instanceof Error ? e.message : 'הפעולה נכשלה, נסו שוב');
     } finally {
       setAiBusy(null);
+    }
+  }
+
+  // ===== כלי הסרת רקע לבן — מקומי, בלי AI ובלי שרת =====
+  function closeBgTool() {
+    setBgOpen(false);
+    setBgPreview(null);
+    bgSource.current = null;
+  }
+
+  async function openBgTool() {
+    const src = localImg ?? cloudUrl;
+    if (!src || bgLoading || uploading) return;
+    setBgOpen(true);
+    setBgLoading(true);
+    setBgPreview(null);
+    bgSource.current = null;
+    try {
+      // תצוגה מוקטנת כדי שהסליידרים יגיבו מיד
+      const prepared = await prepareWhiteSource(src, 700);
+      bgSource.current = prepared;
+      setBgPreview(applyWhiteThresholds(prepared, bgLo, bgHi));
+    } catch (e) {
+      setBgOpen(false);
+      Alert.alert('שגיאה', e instanceof Error ? e.message : 'קריאת התמונה נכשלה');
+    } finally {
+      setBgLoading(false);
+    }
+  }
+
+  function refreshBgPreview(lo: number, hi: number) {
+    const prepared = bgSource.current;
+    if (!prepared) return;
+    setBgPreview(applyWhiteThresholds(prepared, lo, hi));
+  }
+
+  function onBgLoChange(v: number) {
+    const lo = Math.round(v);
+    const hi = Math.max(bgHi, Math.min(BG_HI_MAX, lo + 1));
+    setBgLo(lo);
+    setBgHi(hi);
+    refreshBgPreview(lo, hi);
+  }
+
+  function onBgHiChange(v: number) {
+    const hi = Math.round(v);
+    const lo = Math.min(bgLo, Math.max(BG_LO_MIN, hi - 1));
+    setBgLo(lo);
+    setBgHi(hi);
+    refreshBgPreview(lo, hi);
+  }
+
+  async function applyBgTool() {
+    const src = localImg ?? cloudUrl;
+    if (!src || bgApplying) return;
+    setBgApplying(true);
+    try {
+      // העיבוד הסופי ברזולוציה מלאה, לא בגרסה המוקטנת של התצוגה
+      const full = await prepareWhiteSource(src, 4096);
+      const dataUrl = applyWhiteThresholds(full, bgLo, bgHi);
+      const url = await uploadImage(dataUrl);
+      setLocalImg(url);
+      setCloudUrl(url);
+      fitImageBox(url);
+      setHasTransparency(true);
+      closeBgTool();
+    } catch (e) {
+      Alert.alert('שגיאה', e instanceof Error ? e.message : 'העיבוד נכשל, נסו שוב');
+    } finally {
+      setBgApplying(false);
     }
   }
 
@@ -2324,7 +2415,9 @@ export default function Studio() {
               ).map((b) => (
                 <Pressable
                   key={b.kind}
-                  onPress={() => runAi(b.kind)}
+                  onPress={() =>
+                    b.kind === 'bg' && canRemoveWhiteLocally() ? openBgTool() : runAi(b.kind)
+                  }
                   disabled={!!aiBusy}
                   style={[st.aiBtn, aiBusy === b.kind && st.aiBtnBusy]}
                 >
@@ -2593,8 +2686,128 @@ export default function Studio() {
           </View>
         </View>
       </Modal>
+
+      {/* כלי הסרת רקע לבן — אותו אלגוריתם של הכלי באתר, רץ על המכשיר */}
+      <Modal visible={bgOpen} transparent animationType="slide" onRequestClose={closeBgTool}>
+        <View style={st.graphicsBackdrop}>
+          <View style={st.bgSheet}>
+            <View style={st.graphicsHeader}>
+              <Text style={st.graphicsTitle}>הסרת רקע לבן</Text>
+              <Pressable onPress={closeBgTool} hitSlop={8}>
+                <Text style={st.graphicsClose}>✕</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView contentContainerStyle={st.bgScroll}>
+              <Text style={st.bgSub}>
+                כל פיקסל קרוב ללבן הופך שקוף לגמרי, וכל פיקסל אחר נשאר אטום. עובד על עיצובים עם רקע
+                לבן אחיד.
+              </Text>
+
+              <View
+                style={[
+                  st.bgPreviewBox,
+                  { width: Math.min(winWidth - 2 * S.md - 2 * S.md, 340), height: Math.min(winWidth - 2 * S.md - 2 * S.md, 340) },
+                ]}
+              >
+                <Checkerboard size={Math.min(winWidth - 2 * S.md - 2 * S.md, 340)} />
+                {bgLoading || !bgPreview ? (
+                  <ActivityIndicator color={C.accent} />
+                ) : (
+                  <Image source={{ uri: bgPreview }} style={st.bgPreviewImg} contentFit="contain" />
+                )}
+              </View>
+
+              <View style={st.bgControl}>
+                <View style={st.bgLabelRow}>
+                  <Text style={st.bgValue}>{bgLo}</Text>
+                  <Text style={st.bgLabel}>סף אטימות מלאה</Text>
+                </View>
+                <Slider
+                  style={st.slider}
+                  inverted={SLIDER_INVERTED}
+                  minimumValue={BG_LO_MIN}
+                  maximumValue={BG_LO_MAX}
+                  step={1}
+                  value={bgLo}
+                  onValueChange={onBgLoChange}
+                  minimumTrackTintColor={C.accent}
+                  maximumTrackTintColor={C.border}
+                  thumbTintColor={C.accent}
+                />
+              </View>
+
+              <View style={st.bgControl}>
+                <View style={st.bgLabelRow}>
+                  <Text style={st.bgValue}>{bgHi}</Text>
+                  <Text style={st.bgLabel}>סף שקיפות מלאה</Text>
+                </View>
+                <Slider
+                  style={st.slider}
+                  inverted={SLIDER_INVERTED}
+                  minimumValue={BG_HI_MIN}
+                  maximumValue={BG_HI_MAX}
+                  step={1}
+                  value={bgHi}
+                  onValueChange={onBgHiChange}
+                  minimumTrackTintColor={C.accent}
+                  maximumTrackTintColor={C.border}
+                  thumbTintColor={C.accent}
+                />
+              </View>
+
+              <Text style={st.bgNote}>
+                שוליים לבנים דקים סביב האותיות? הורידו את סף האטימות.{'\n'}
+                צבעים בהירים בעיצוב נעלמים בטעות? העלו את סף השקיפות.
+              </Text>
+
+              <View style={st.bgActions}>
+                <Pressable
+                  style={[st.bgApplyBtn, (bgApplying || bgLoading) && st.histBtnOff]}
+                  onPress={applyBgTool}
+                  disabled={bgApplying || bgLoading}
+                >
+                  {bgApplying ? (
+                    <ActivityIndicator color={C.onAccent} size="small" />
+                  ) : (
+                    <Text style={st.bgApplyText}>החלה על העיצוב</Text>
+                  )}
+                </Pressable>
+                <Pressable style={st.bgCancelBtn} onPress={closeBgTool} disabled={bgApplying}>
+                  <Text style={st.bgCancelText}>ביטול</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
+}
+
+// רקע שחמט מאחורי התצוגה — כך רואים בפועל מה הפך שקוף
+function Checkerboard({ size, cell = 20 }: { size: number; cell?: number }) {
+  const count = Math.ceil(size / cell);
+  const squares: ReactNode[] = [];
+  for (let row = 0; row < count; row++) {
+    for (let col = 0; col < count; col++) {
+      if ((row + col) % 2 === 0) continue;
+      squares.push(
+        <View
+          key={`${row}-${col}`}
+          style={{
+            position: 'absolute',
+            top: row * cell,
+            left: col * cell,
+            width: cell,
+            height: cell,
+            backgroundColor: '#cccccc',
+          }}
+        />,
+      );
+    }
+  }
+  return <View style={[st.checkerLayer, { backgroundColor: '#ffffff' }]}>{squares}</View>;
 }
 
 const st = StyleSheet.create({
@@ -3056,4 +3269,66 @@ const st = StyleSheet.create({
   },
   nextBtnDisabled: { backgroundColor: C.surfaceHi },
   nextBtnText: { color: C.onAccent, fontSize: 17, fontWeight: '800' },
+
+  // כלי הסרת רקע לבן
+  bgSheet: {
+    backgroundColor: C.bg,
+    borderTopLeftRadius: R.lg,
+    borderTopRightRadius: R.lg,
+    maxHeight: '92%',
+    padding: S.md,
+  },
+  bgScroll: { paddingBottom: S.lg, alignItems: 'center' },
+  bgSub: {
+    color: C.textDim,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'right',
+    alignSelf: 'stretch',
+    marginTop: S.sm,
+    marginBottom: S.md,
+  },
+  bgPreviewBox: {
+    borderRadius: R.sm,
+    borderWidth: 1,
+    borderColor: C.border,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bgPreviewImg: { width: '100%', height: '100%' },
+  checkerLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  bgControl: { alignSelf: 'stretch', marginTop: S.md },
+  bgLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  bgLabel: { color: C.textDim, fontSize: 13 },
+  bgValue: { color: C.text, fontSize: 13, fontWeight: '700' },
+  bgNote: {
+    color: C.textDim,
+    fontSize: 12.5,
+    lineHeight: 19,
+    textAlign: 'right',
+    alignSelf: 'stretch',
+    marginTop: S.md,
+    paddingTop: S.sm,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+  },
+  bgActions: { flexDirection: 'row', alignSelf: 'stretch', gap: S.sm, marginTop: S.md },
+  bgApplyBtn: {
+    flex: 1,
+    backgroundColor: C.accent,
+    borderRadius: R.full,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  bgApplyText: { color: C.onAccent, fontSize: 15, fontWeight: '800' },
+  bgCancelBtn: {
+    borderRadius: R.full,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingVertical: 14,
+    paddingHorizontal: S.lg,
+    alignItems: 'center',
+  },
+  bgCancelText: { color: C.text, fontSize: 15, fontWeight: '700' },
 });
