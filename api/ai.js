@@ -1,6 +1,6 @@
 // גשר לכלי ה-AI: מעביר בקשות מהאפליקציה אל elronprint-studio-api (שרת-לשרת, בלי CORS)
 const UPSTREAM = "https://elronprint-studio-api.vercel.app/api";
-const ALLOWED_ENDPOINTS = new Set(["upscale", "removebg-upload", "reimagine"]);
+const ALLOWED_ENDPOINTS = new Set(["upscale", "removebg-upload", "reimagine", "extract", "auth"]);
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
