@@ -143,6 +143,12 @@ function resolveDesignUri(source: number | string): string | null {
   return null;
 }
 
+// בבנייה נייטיב לגרסת הפצה אנדרואיד שומר תמונות מוטמעות כמשאב פנימי, לא כקובץ —
+// אפשר להציג אותן אבל אי אפשר להעלות אותן לענן מהמכשיר. לכן בנייטיב מבקשים
+// מקלאודינרי למשוך את העיצוב ישירות מהכתובת הציבורית שלו במקום להעלות מהטלפון.
+const DESIGN_RAW_BASE =
+  'https://raw.githubusercontent.com/elronprint-collab/elronprint-app/main/assets/designs';
+
 // עיצובים מוכנים — סטריפ ה"עיצובים מוכנים" מעל אזור ההעלאה (מחליף את הרשימה שהגיעה
 // בעבר מ-Shopify best-sellers). בחירה טוענת את העיצוב כתמונה, בדיוק כמו READY_DESIGNS.
 const STARTER_DESIGNS: ReadyDesign[] = [
@@ -1456,8 +1462,8 @@ export default function Studio() {
     try {
       const url = await uploadImage(uri);
       setCloudUrl(url);
-    } catch {
-      Alert.alert('שגיאה', 'העלאת התמונה נכשלה. בדקו חיבור לאינטרנט ונסו שוב.');
+    } catch (e) {
+      Alert.alert('שגיאה', e instanceof Error ? e.message : 'העלאת התמונה נכשלה');
     } finally {
       setUploading(false);
     }
@@ -1477,10 +1483,13 @@ export default function Studio() {
     setHasTransparency(false);
     fitImageBox(uri);
     try {
-      const url = await uploadImage(uri);
+      const url =
+        Platform.OS === 'web'
+          ? await uploadImage(uri)
+          : await uploadRemote(`${DESIGN_RAW_BASE}/${design.slug}.jpg`);
       setCloudUrl(url);
-    } catch {
-      Alert.alert('שגיאה', 'טעינת העיצוב נכשלה. בדקו חיבור לאינטרנט ונסו שוב.');
+    } catch (e) {
+      Alert.alert('שגיאה', e instanceof Error ? e.message : 'טעינת העיצוב נכשלה');
     } finally {
       setUploading(false);
     }
@@ -1499,10 +1508,13 @@ export default function Studio() {
     setHasTransparency(false);
     fitImageBox(uri);
     try {
-      const url = await uploadImage(uri);
+      const url =
+        Platform.OS === 'web'
+          ? await uploadImage(uri)
+          : await uploadRemote(`${DESIGN_RAW_BASE}/${design.slug}.png`);
       setCloudUrl(url);
-    } catch {
-      Alert.alert('שגיאה', 'טעינת העיצוב נכשלה. בדקו חיבור לאינטרנט ונסו שוב.');
+    } catch (e) {
+      Alert.alert('שגיאה', e instanceof Error ? e.message : 'טעינת העיצוב נכשלה');
     } finally {
       setUploading(false);
     }
@@ -1649,7 +1661,7 @@ export default function Studio() {
         const url = await uploadImage(localImg);
         setCloudUrl(url);
       } catch {
-        Alert.alert('שגיאה', 'העלאת התמונה נכשלה. בדקו חיבור לאינטרנט ונסו שוב.');
+        Alert.alert('שגיאה', e instanceof Error ? e.message : 'העלאת התמונה נכשלה');
         setUploading(false);
         return;
       }
@@ -2546,12 +2558,12 @@ export default function Studio() {
           <Text style={st.hint}>בוחרים עיצוב ← לוחצים "עיצוב מחדש ✨" לקבלת גרסה ייחודית משלכם</Text>
         </>
 
-        <View style={[st.rowSpread, { flexWrap: 'nowrap' }]}>
-          <Pressable style={st.graphicsBtn} onPress={() => setReadyDesignsOpen(true)}>
-            <Text style={st.graphicsBtnText}>✨ עיצובים מוכנים</Text>
+        <View style={st.rowSpread}>
+          <Pressable style={[st.graphicsBtn, { flexShrink: 1 }]} onPress={() => setReadyDesignsOpen(true)}>
+            <Text style={st.graphicsBtnText} numberOfLines={1}>✨ עיצובים מוכנים</Text>
           </Pressable>
           <Pressable
-            style={[st.nextBtn, { flex: 1, marginTop: 0 }, (!hasDesign && !localImg || uploading || ordering) && st.nextBtnDisabled]}
+            style={[st.nextBtn, { flexGrow: 1, flexBasis: 160, marginTop: 0 }, (!hasDesign && !localImg || uploading || ordering) && st.nextBtnDisabled]}
             disabled={(!hasDesign && !localImg) || uploading || ordering}
             onPress={continueToOrder}
           >
@@ -3178,7 +3190,7 @@ const st = StyleSheet.create({
     textAlign: 'right',
     marginBottom: S.sm,
   },
-  toolbarRow: { flexDirection: 'row', gap: S.xs, alignItems: 'center' },
+  toolbarRow: { flexDirection: 'row', flexWrap: 'wrap', gap: S.xs, alignItems: 'center' },
   toolFontBtn: {
     minWidth: 64,
     maxWidth: 90,
