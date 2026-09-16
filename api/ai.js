@@ -1,5 +1,7 @@
 // גשר לכלי ה-AI: מעביר בקשות מהאפליקציה אל elronprint-studio-api (שרת-לשרת, בלי CORS)
 const UPSTREAM = "https://elronprint-studio-api.vercel.app/api";
+// auth דורש חתימת Shopify App Proxy — לכן עובר דרך החנות, שמוסיפה את החתימה בעצמה
+const AUTH_VIA_STORE = "https://elronprint.co.il/apps/ai-academy/auth";
 const ALLOWED_ENDPOINTS = new Set(["upscale", "removebg-upload", "reimagine", "extract", "auth"]);
 
 export default async function handler(req, res) {
@@ -13,8 +15,11 @@ export default async function handler(req, res) {
   if (!ALLOWED_ENDPOINTS.has(endpoint)) {
     return res.status(400).json({ error: "Unknown endpoint" });
   }
+
+  const url = endpoint === "auth" ? AUTH_VIA_STORE : `${UPSTREAM}/${endpoint}`;
+
   try {
-    const upstream = await fetch(`${UPSTREAM}/${endpoint}`, {
+    const upstream = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload || {}),
