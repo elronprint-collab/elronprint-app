@@ -1739,6 +1739,8 @@ export default function Studio() {
         image: cloudUrl,
         design: {
           shirtHex: shirt.hex,
+          areaW: AREA_W,
+          areaH: AREA_H,
           image: cloudUrl,
           imageTransform: cloudUrl
             ? {
