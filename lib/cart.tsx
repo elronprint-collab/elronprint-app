@@ -46,6 +46,8 @@ export type CartImageTransform = {
 
 export type CartDesign = {
   shirtHex: string;
+  areaW?: number; // מידות קנבס הסטודיו בעת ההוספה לעגלה (לתצוגה הממוזערת)
+  areaH?: number;
   image: string | null;
   imageTransform?: CartImageTransform;
   layers: DesignLayer[];
