@@ -17,25 +17,30 @@ import { CartDesign, useCart } from '../../lib/cart';
 import { createCheckout } from '../../lib/shopify';
 import { C, R, S } from '../../lib/theme';
 
-const MINI = 0.34;
+const MINI_W = 78; // רוחב אזור העיצוב בתמונה הממוזערת
 
 function MiniPreview({ design }: { design: CartDesign }) {
   const it = design.imageTransform;
+  // הקנבס בסטודיו משתנה לפי גודל המסך, לכן יחס ההמרה נגזר מהמידות שנשמרו יחד עם העיצוב
+  // (לפריטים ישנים בלי מידות שמורות: ברירת המחדל הישנה).
+  const areaW = design.areaW ?? 230;
+  const areaH = design.areaH ?? 276;
+  const k = MINI_W / areaW;
   return (
     <View style={[st.mini, { backgroundColor: design.shirtHex }]}>
-      <View style={st.miniArea}>
+      <View style={{ width: areaW * k, height: areaH * k }}>
         {design.image && it && (
           <View
             style={{
               position: 'absolute',
-              left: (it.x - it.w / 2) * MINI,
-              top: (it.y - it.h / 2) * MINI,
-              width: it.w * MINI,
-              height: it.h * MINI,
+              left: (it.x - it.w / 2) * k,
+              top: (it.y - it.h / 2) * k,
+              width: it.w * k,
+              height: it.h * k,
               opacity: it.opacity / 100,
-              borderRadius: (it.cornerRadius ?? 0) * MINI,
+              borderRadius: (it.cornerRadius ?? 0) * k,
               overflow: 'hidden',
-              borderWidth: !it.borderStyle || it.borderStyle === 'none' ? 0 : (it.borderWidth ?? 0) * MINI,
+              borderWidth: !it.borderStyle || it.borderStyle === 'none' ? 0 : (it.borderWidth ?? 0) * k,
               borderColor: it.borderColor ?? '#ffffff',
               borderStyle: !it.borderStyle || it.borderStyle === 'none' ? 'solid' : it.borderStyle,
               transform: [
@@ -52,8 +57,8 @@ function MiniPreview({ design }: { design: CartDesign }) {
                 {
                   width: `${(it.cropScale ?? 1) * 100}%` as any,
                   height: `${(it.cropScale ?? 1) * 100}%` as any,
-                  left: (it.cropOffsetX ?? 0) * MINI,
-                  top: (it.cropOffsetY ?? 0) * MINI,
+                  left: (it.cropOffsetX ?? 0) * k,
+                  top: (it.cropOffsetY ?? 0) * k,
                 },
               ]}
               contentFit="contain"
@@ -61,59 +66,63 @@ function MiniPreview({ design }: { design: CartDesign }) {
           </View>
         )}
         {design.image && !it && <Image source={{ uri: design.image }} style={st.miniImg} contentFit="contain" />}
-        {design.layers.map((l, i) => (
-          <View
-            key={i}
-            style={{
-              position: 'absolute',
-              left: l.x * MINI,
-              top: l.y * MINI,
-              width: l.width != null ? l.width * MINI : undefined,
-              height: l.height != null ? l.height * MINI : undefined,
-              justifyContent: l.height != null ? 'center' : undefined,
-              opacity: l.opacity / 100,
-              transform: [
-                { translateX: '-50%' as never },
-                { translateY: '-50%' as never },
-                { rotate: `${l.rotation}deg` },
-                { scaleX: l.flipH ? -1 : 1 },
-                { scaleY: l.flipV ? -1 : 1 },
-              ],
-            }}
-          >
-            <Text
-              style={[
-                {
-                  fontFamily: l.fontFamily,
-                  color: l.color,
-                  fontSize: Math.max(6, l.size * MINI),
-                  lineHeight: Math.max(7, l.size * l.lineHeight * MINI),
-                  textAlign: l.align,
-                  letterSpacing: l.spacing * MINI,
-                  fontWeight: l.bold ? '700' : 'normal',
-                  fontStyle: l.italic ? 'italic' : 'normal',
-                  textDecorationLine:
-                    l.underline && l.strikethrough
-                      ? 'underline line-through'
-                      : l.underline
-                        ? 'underline'
-                        : l.strikethrough
-                          ? 'line-through'
-                          : 'none',
-                },
-                l.highlight != null && { backgroundColor: l.highlight, paddingHorizontal: 2 },
-                l.shadow && {
-                  textShadowColor: '#00000099',
-                  textShadowRadius: 2,
-                  textShadowOffset: { width: 1, height: 1 },
-                },
-              ]}
-              numberOfLines={2}
+        {design.layers.map((l, i) => {
+          // מיקום בפיקסלים מדויקים (בלי translate באחוזים, שלא אמין ב-native): הקופסה של השכבה
+          // מוצבת סביב מרכזה (x,y), והטקסט ממורכז בתוכה.
+          const w = (l.width ?? areaW) * k;
+          const h = (l.height ?? l.size * l.lineHeight * 2) * k;
+          return (
+            <View
+              key={i}
+              style={{
+                position: 'absolute',
+                left: l.x * k - w / 2,
+                top: l.y * k - h / 2,
+                width: w,
+                height: h,
+                justifyContent: 'center',
+                opacity: l.opacity / 100,
+                transform: [
+                  { rotate: `${l.rotation}deg` },
+                  { scaleX: l.flipH ? -1 : 1 },
+                  { scaleY: l.flipV ? -1 : 1 },
+                ],
+              }}
             >
-              {l.text}
-            </Text>
-          </View>
-        ))}
+              <Text
+                style={[
+                  {
+                    fontFamily: l.fontFamily,
+                    color: l.color,
+                    fontSize: Math.max(6, l.size * k),
+                    lineHeight: Math.max(7, l.size * l.lineHeight * k),
+                    textAlign: l.align,
+                    letterSpacing: l.spacing * k,
+                    fontWeight: l.bold ? '700' : 'normal',
+                    fontStyle: l.italic ? 'italic' : 'normal',
+                    textDecorationLine:
+                      l.underline && l.strikethrough
+                        ? 'underline line-through'
+                        : l.underline
+                          ? 'underline'
+                          : l.strikethrough
+                            ? 'line-through'
+                            : 'none',
+                  },
+                  l.highlight != null && { backgroundColor: l.highlight, paddingHorizontal: 2 },
+                  l.shadow && {
+                    textShadowColor: '#00000099',
+                    textShadowRadius: 2,
+                    textShadowOffset: { width: 1, height: 1 },
+                  },
+                ]}
+                numberOfLines={2}
+              >
+                {l.text}
+              </Text>
+            </View>
+          );
+        })}
       </View>
     </View>
   );
@@ -261,7 +270,6 @@ const st = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  miniArea: { width: 230 * 0.34, height: 280 * 0.34 },
   miniImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: S.lg },
   empty: { color: C.text, fontSize: 18, fontWeight: '700' },
